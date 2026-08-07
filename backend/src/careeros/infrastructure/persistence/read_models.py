@@ -10,7 +10,12 @@ from __future__ import annotations
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from careeros.application.dto.job_dto import ApplicationSummary, ApplicationTimelineEntry, JobSummary
+from careeros.application.dto.job_dto import (
+    ApplicationSummary,
+    ApplicationTimelineEntry,
+    JobSummary,
+    ScoreDetail,
+)
 from careeros.infrastructure.persistence.models import (
     ApplicationModel,
     ApplicationStatusEventModel,
@@ -34,14 +39,34 @@ def _format_location(city: str | None, country: str | None) -> str | None:
     return ", ".join(parts) if parts else None
 
 
+def _score_detail(score: ScoreModel | None) -> ScoreDetail | None:
+    if score is None:
+        return None
+    return ScoreDetail(
+        value=score.value,
+        resume_match=score.resume_match,
+        skill_area_fit=score.skill_area_fit,
+        career_progression_fit=score.career_progression_fit,
+        remote_fit=score.remote_fit,
+        salary_fit=score.salary_fit,
+        company_quality=score.company_quality,
+        narrative=score.narrative,
+        model_used=score.model_used,
+        strategy_version=score.scoring_strategy_version,
+    )
+
+
 class JobReadModel:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def list_jobs(self, *, limit: int = 50, offset: int = 0) -> list[JobSummary]:
+    async def list_jobs(
+        self, *, limit: int = 50, offset: int = 0, order_by_score: bool = False, min_score: int | None = None
+    ) -> list[JobSummary]:
+        """Discovered jobs. `order_by_score` gives the ranked shortlist; default is newest-first."""
         latest = _latest_score_subquery()
         stmt = (
-            select(JobModel, CompanyModel.name, ApplicationModel.status, ScoreModel.value)
+            select(JobModel, CompanyModel.name, ApplicationModel.status, ScoreModel)
             .join(CompanyModel, CompanyModel.id == JobModel.company_id)
             .outerjoin(ApplicationModel, ApplicationModel.job_id == JobModel.id)
             .outerjoin(latest, latest.c.job_id == JobModel.id)
@@ -49,11 +74,14 @@ class JobReadModel:
                 ScoreModel,
                 (ScoreModel.job_id == latest.c.job_id) & (ScoreModel.created_at == latest.c.latest_at),
             )
-            .order_by(JobModel.discovered_at.desc())
-            .limit(limit)
-            .offset(offset)
         )
-        rows = (await self._session.execute(stmt)).all()
+        if min_score is not None:
+            stmt = stmt.where(ScoreModel.value >= min_score)
+        # nulls_last so unscored jobs sink below the ranked ones rather than heading the shortlist.
+        stmt = stmt.order_by(
+            ScoreModel.value.desc().nulls_last() if order_by_score else JobModel.discovered_at.desc()
+        )
+        rows = (await self._session.execute(stmt.limit(limit).offset(offset))).all()
         return [
             JobSummary(
                 id=job.id,
@@ -71,13 +99,18 @@ class JobReadModel:
                 posting_date=job.posting_date,
                 discovered_at=job.discovered_at,
                 status=status,
-                score=score,
+                score=score.value if score else None,
+                score_detail=_score_detail(score),
             )
             for job, company_name, status, score in rows
         ]
 
     async def count_jobs(self) -> int:
         return (await self._session.execute(select(func.count()).select_from(JobModel))).scalar_one()
+
+    async def count_scored(self) -> int:
+        stmt = select(func.count(func.distinct(ScoreModel.job_id)))
+        return (await self._session.execute(stmt)).scalar_one()
 
 
 class ApplicationReadModel:

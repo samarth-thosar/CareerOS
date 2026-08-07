@@ -1,0 +1,72 @@
+# Your career profile -- the "who am I" that every job is scored against.
+#
+# This file is the seed. It is loaded into the database (POST /profile/reload, or on startup when
+# profile.seed_on_startup is true), and from then on the database copy is what scoring reads -- so the Memory
+# module has somewhere durable to record learned adjustments without fighting this file.
+#
+# Nothing here is secret, so it is committed. Credentials belong in .env.
+# Re-run the reload after editing.
+
+headline: Software Engineer
+summary: >
+  Replace this with two or three sentences describing your actual experience: the kind of systems you have
+  built, the stack you are strongest in, and the scale or impact you can speak to. Scoring quotes this when
+  judging seniority and career progression, so vague text here produces vague reasoning.
+
+years_experience: 2
+
+# Ranked 1-5, the same star ratings you gave. Role fit is scored against these, so the ranking is data --
+# the model is never left to guess what you want.
+role_interests:
+  - { title: AI Automation Engineer, priority: 5 }
+  - { title: AI Engineer, priority: 5 }
+  - { title: Applied AI Engineer, priority: 5 }
+  - { title: LLM Engineer, priority: 5 }
+  - { title: Backend Engineer, priority: 4 }
+  - { title: Python Engineer, priority: 4 }
+  - { title: Full Stack Engineer, priority: 4 }
+  - { title: MERN Stack Developer, priority: 4 }
+  - { title: Software Engineer, priority: 4 }
+  - { title: React Developer, priority: 4 }
+  - { title: Next.js Developer, priority: 4 }
+  - { title: Frontend Engineer, priority: 4 }
+  - { title: React Native Developer, priority: 4 }
+  - { title: Flutter Developer, priority: 4 }
+
+# What you can actually claim. Keep this honest -- it is the basis for skill-fit scoring, and later for
+# resume tailoring, which must never assert a skill that is not here.
+skills:
+  - python
+  - typescript
+  - javascript
+  - react
+  - next.js
+  - node.js
+  - fastapi
+  - mongodb
+  - postgresql
+  - docker
+  - git
+  - llm
+  - rag
+  - langchain
+
+preferences:
+  # One of: remote, hybrid, onsite, any
+  remote_preference: remote
+  # Annual, in the currency you think in. Jobs below this lose points rather than being discarded, since most
+  # postings do not publish pay at all.
+  salary_floor: null
+  preferred_locations:
+    - Remote
+    - India
+  # Broad areas used for skill-area fit scoring.
+  target_skill_areas:
+    - ai
+    - backend
+    - frontend
+    - fullstack
+    - mobile
+
+# Companies to never apply to, by name. Matched with the same normalization used for company de-duplication.
+do_not_apply_companies: []

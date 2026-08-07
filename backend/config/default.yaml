@@ -16,6 +16,24 @@ llm:
   provider: ollama
   model: qwen3:8b
   base_url: http://localhost:11434
+  timeout_seconds: 300
+  keep_alive: 10m
+  max_output_tokens: 800
+  # Qwen3 reasons out loud by default. CareerOS stores the model's own narrative instead, and measurements on
+  # this hardware showed ~35% faster scoring with thinking off.
+  disable_thinking: true
+
+scoring:
+  # Each job costs one local LLM call (~1 minute on a 4GB-VRAM laptop GPU), so the backlog is drained in
+  # bounded, resumable slices rather than all at once.
+  batch_size: 20
+  interval_seconds: 900
+  run_on_startup: false
+
+profile:
+  # Off by default so a profile the Memory module has adjusted is not silently reverted by a stale YAML file.
+  # Seed explicitly with POST /profile/reload.
+  seed_on_startup: false
 
 feature_flags:
   auto_apply_enabled: false

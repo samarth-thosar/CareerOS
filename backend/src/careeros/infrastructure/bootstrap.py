@@ -29,14 +29,17 @@ from careeros.application.ports.event_bus import EventBus
 from careeros.application.ports.id_generator import IdGenerator
 from careeros.application.ports.job_source_provider import JobSourceProvider, SearchCriteria
 from careeros.application.services.application_tracker_service import ApplicationTrackerService
+from careeros.application.services.candidate_profile_service import CandidateProfileService
 from careeros.application.services.command_dispatcher import CommandDispatcher
 from careeros.application.services.company_intelligence_service import CompanyIntelligenceService
 from careeros.application.services.company_resolver import CompanyResolver
 from careeros.application.services.cover_letter_service import CoverLetterService
 from careeros.application.services.discovery_service import DiscoveryService
 from careeros.application.services.memory_service import MemoryService
-from careeros.application.services.scoring_service import ScoringService
+from careeros.application.services.scoring_service import DimensionWeights, ScoringService
+from careeros.domain.candidate.candidate_profile import CandidateProfile
 from careeros.domain.events import JobDiscovered, JobScored
+from careeros.infrastructure.config.profile_loader import load_profile
 from careeros.infrastructure.config.settings import Settings, load_settings
 from careeros.infrastructure.events.deferred_event_bus import DeferredEventBus
 from careeros.infrastructure.events.in_process_event_bus import InProcessEventBus
@@ -138,7 +141,14 @@ def build_container() -> Container:
         clock=SystemClock(),
         id_generator=UuidGenerator(),
         event_bus=InProcessEventBus(),
-        llm_provider=OllamaProvider(base_url=settings.llm.base_url, model=settings.llm.model),
+        llm_provider=OllamaProvider(
+            base_url=settings.llm.base_url,
+            model=settings.llm.model,
+            timeout_seconds=settings.llm.timeout_seconds,
+            keep_alive=settings.llm.keep_alive,
+            max_output_tokens=settings.llm.max_output_tokens,
+            disable_thinking=settings.llm.disable_thinking,
+        ),
         scheduler=APSchedulerAdapter(),
         job_source_providers=build_job_source_providers(settings),
     )
@@ -155,6 +165,7 @@ class Services:
     discovery: DiscoveryService
     scoring: ScoringService
     application_tracker: ApplicationTrackerService
+    candidate_profile: CandidateProfileService
     company_intelligence: CompanyIntelligenceService
     company_resolver: CompanyResolver
     cover_letter: CoverLetterService
@@ -183,11 +194,13 @@ def build_services(container: Container, repos: Repositories, event_bus: EventBu
         scoring=ScoringService(
             job_repository=repos.jobs,
             score_repository=repos.scores,
+            company_repository=repos.companies,
             candidate_profile_repository=repos.candidate_profile,
             llm_provider=container.llm_provider,
             event_bus=event_bus,
             clock=container.clock,
             id_generator=container.id_generator,
+            weights=DimensionWeights(**container.settings.scoring_weights.model_dump()),
         ),
         application_tracker=ApplicationTrackerService(
             application_repository=repos.applications,
@@ -195,6 +208,9 @@ def build_services(container: Container, repos: Repositories, event_bus: EventBu
             clock=container.clock,
             id_generator=container.id_generator,
             auto_interested_threshold=container.settings.tracker.auto_interested_threshold,
+        ),
+        candidate_profile=CandidateProfileService(
+            candidate_profile_repository=repos.candidate_profile,
         ),
         company_intelligence=CompanyIntelligenceService(
             company_repository=repos.companies,
@@ -268,3 +284,21 @@ def register_scheduled_jobs(container: Container) -> None:
             make_cycle(provider_name),
             container.settings.discovery.interval_seconds,
         )
+
+    # Drains the scoring backlog a bounded slice at a time. Deliberately not driven by JobDiscovered: a single
+    # discovery run can add hundreds of jobs, and at ~1 minute of local inference each, reacting per-event
+    # would fan out into an unbounded pile of concurrent LLM calls.
+    async def score_batch() -> None:
+        await in_session(
+            container, lambda s: s.scoring.score_pending(container.settings.scoring.batch_size)
+        )
+
+    container.scheduler.schedule_interval(
+        "scoring:pending", score_batch, container.settings.scoring.interval_seconds
+    )
+
+
+async def seed_candidate_profile(container: Container) -> CandidateProfile:
+    """Load config/profile.yaml into the database, replacing the single profile row."""
+    profile = load_profile()
+    return await in_session(container, lambda s: s.candidate_profile.replace(profile))

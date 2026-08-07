@@ -1,11 +1,11 @@
 """SqlAlchemyJobRepository -- SQLite-backed implementation of the JobRepository port."""
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from careeros.domain.job.job import Job, JobSource, Location, RemoteType, SalaryRange
-from careeros.infrastructure.persistence.models import JobModel
+from careeros.infrastructure.persistence.models import JobModel, ScoreModel
 
 
 def _to_domain(model: JobModel) -> Job:
@@ -73,6 +73,25 @@ class SqlAlchemyJobRepository:
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
         return _to_domain(model) if model else None
+
+    async def find_unscored(self, limit: int) -> list[Job]:
+        """Jobs with no Score row yet, oldest discovery first so the backlog drains in arrival order."""
+        stmt = (
+            select(JobModel)
+            .where(~select(ScoreModel.id).where(ScoreModel.job_id == JobModel.id).exists())
+            .order_by(JobModel.discovered_at)
+            .limit(limit)
+        )
+        result = await self._session.execute(stmt)
+        return [_to_domain(model) for model in result.scalars().all()]
+
+    async def count_unscored(self) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(JobModel)
+            .where(~select(ScoreModel.id).where(ScoreModel.job_id == JobModel.id).exists())
+        )
+        return (await self._session.execute(stmt)).scalar_one()
 
     async def add(self, job: Job) -> None:
         self._session.add(_to_model(job))

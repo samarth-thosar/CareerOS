@@ -22,11 +22,23 @@ async def list_jobs(
     session: Annotated[AsyncSession, Depends(get_session)],
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
+    ranked: Annotated[bool, Query(description="Order by score instead of discovery date")] = False,
+    min_score: Annotated[int | None, Query(ge=0, le=100)] = None,
 ) -> dict[str, Any]:
-    """Every discovered job, newest first, with its tracked status and latest score."""
+    """Discovered jobs with their tracked status and latest score.
+
+    `ranked=true` (optionally with `min_score`) is the shortlist view: best fit first, with the itemized
+    reasoning behind each score attached.
+    """
     read_model = JobReadModel(session)
-    jobs = await read_model.list_jobs(limit=limit, offset=offset)
-    return {"total": await read_model.count_jobs(), "items": [asdict(job) for job in jobs]}
+    jobs = await read_model.list_jobs(
+        limit=limit, offset=offset, order_by_score=ranked, min_score=min_score
+    )
+    return {
+        "total": await read_model.count_jobs(),
+        "scored": await read_model.count_scored(),
+        "items": [asdict(job) for job in jobs],
+    }
 
 
 @router.post("/discover")

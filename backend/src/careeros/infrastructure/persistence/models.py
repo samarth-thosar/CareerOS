@@ -182,11 +182,17 @@ class CandidateProfileModel(Base):
     __tablename__ = "candidate_profile"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
+    headline: Mapped[str | None] = mapped_column(String, nullable=True)
+    summary: Mapped[str | None] = mapped_column(String, nullable=True)
+    years_experience: Mapped[float | None] = mapped_column(Float, nullable=True)
     master_resume_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     skills: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # [{"title": ..., "priority": 1-5}]; kept as JSON because it is only ever read as a whole with the profile.
+    role_interests: Mapped[list[dict]] = mapped_column(JSON, default=list)
     remote_preference: Mapped[str | None] = mapped_column(String, nullable=True)
     salary_floor: Mapped[float | None] = mapped_column(Float, nullable=True)
     target_skill_areas: Mapped[list[str]] = mapped_column(JSON, default=list)
+    preferred_locations: Mapped[list[str]] = mapped_column(JSON, default=list)
     do_not_apply_companies: Mapped[list[str]] = mapped_column(JSON, default=list)
     auto_apply_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     auto_tailor_resume_enabled: Mapped[bool] = mapped_column(Boolean, default=True)

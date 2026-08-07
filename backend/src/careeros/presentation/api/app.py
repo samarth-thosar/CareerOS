@@ -20,11 +20,13 @@ from careeros.infrastructure.bootstrap import (
     register_event_handlers,
     register_scheduled_jobs,
     search_criteria_from,
+    seed_candidate_profile,
 )
 from careeros.infrastructure.logging import configure_logging
 from careeros.presentation.api.routes.applications import router as applications_router
 from careeros.presentation.api.routes.health import router as health_router
 from careeros.presentation.api.routes.jobs import router as jobs_router
+from careeros.presentation.api.routes.scoring import router as scoring_router
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,12 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     register_scheduled_jobs(container)
     app.state.container = container
     await container.scheduler.start()
+
+    if container.settings.profile.seed_on_startup:
+        try:
+            await seed_candidate_profile(container)
+        except Exception:
+            logger.exception("Could not seed the candidate profile from config/profile.yaml")
 
     if container.settings.discovery.run_on_startup:
         await _run_startup_discovery(container)
@@ -74,4 +82,5 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(jobs_router)
     app.include_router(applications_router)
+    app.include_router(scoring_router)
     return app

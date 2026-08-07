@@ -10,6 +10,22 @@ from datetime import datetime
 
 
 @dataclass(slots=True)
+class ScoreDetail:
+    """The itemized reasoning behind a score, so a ranking is always explainable."""
+
+    value: int
+    resume_match: float
+    skill_area_fit: float
+    career_progression_fit: float
+    remote_fit: float
+    salary_fit: float
+    company_quality: float
+    narrative: str
+    model_used: str
+    strategy_version: str
+
+
+@dataclass(slots=True)
 class JobSummary:
     id: str
     source: str
@@ -27,6 +43,7 @@ class JobSummary:
     discovered_at: datetime
     status: str | None
     score: int | None
+    score_detail: ScoreDetail | None
 
 
 @dataclass(slots=True)

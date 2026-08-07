@@ -29,6 +29,32 @@ class LLMSettings(BaseModel):
     provider: str = "ollama"
     model: str = "qwen3:8b"
     base_url: str = "http://localhost:11434"
+    # A scoring call measured ~60s on a 4GB-VRAM laptop GPU, so the ceiling is generous.
+    timeout_seconds: float = 300.0
+    # Keeps the model resident between calls; reloading dominates when draining a backlog one job at a time.
+    keep_alive: str = "10m"
+    max_output_tokens: int = 800
+    # Qwen3 and other reasoning models emit chain-of-thought by default. CareerOS stores the model's own
+    # narrative instead, and disabling thought measured ~35% faster.
+    disable_thinking: bool = True
+
+
+class ScoringSettings(BaseModel):
+    """How the scoring backlog is drained.
+
+    Concurrency stays at 1 by default: a single local Ollama instance serializes generation, so parallel
+    requests mostly just contend for VRAM.
+    """
+
+    batch_size: int = 20
+    interval_seconds: int = 900
+    run_on_startup: bool = False
+
+
+class ProfileSettings(BaseModel):
+    # Load config/profile.yaml into the database on boot. Off by default so a running system's profile -- which
+    # Memory may have adjusted -- is never silently overwritten by a stale file.
+    seed_on_startup: bool = False
 
 
 class FeatureFlags(BaseModel):
@@ -89,11 +115,13 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     scoring_weights: ScoringWeights = ScoringWeights()
+    scoring: ScoringSettings = ScoringSettings()
     llm: LLMSettings = LLMSettings()
     feature_flags: FeatureFlags = FeatureFlags()
     job_sources: JobSourceSettings = JobSourceSettings()
     discovery: DiscoverySettings = DiscoverySettings()
     tracker: TrackerSettings = TrackerSettings()
+    profile: ProfileSettings = ProfileSettings()
 
     @classmethod
     def settings_customise_sources(
