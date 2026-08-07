@@ -27,3 +27,6 @@ backend/.env
 .idea/
 .DS_Store
 Thumbs.db
+
+# Generated resume variants and application artifacts (your real documents, not source)
+backend/data/applications/

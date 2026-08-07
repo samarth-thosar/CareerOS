@@ -26,6 +26,7 @@ from careeros.infrastructure.logging import configure_logging
 from careeros.presentation.api.routes.applications import router as applications_router
 from careeros.presentation.api.routes.health import router as health_router
 from careeros.presentation.api.routes.jobs import router as jobs_router
+from careeros.presentation.api.routes.resumes import router as resumes_router
 from careeros.presentation.api.routes.scoring import router as scoring_router
 
 logger = logging.getLogger(__name__)
@@ -83,4 +84,5 @@ def create_app() -> FastAPI:
     app.include_router(jobs_router)
     app.include_router(applications_router)
     app.include_router(scoring_router)
+    app.include_router(resumes_router)
     return app

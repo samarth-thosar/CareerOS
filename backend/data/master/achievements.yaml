@@ -1,0 +1,51 @@
+# THE ACHIEVEMENT BANK -- the only content a tailored resume may draw from.
+#
+# Everything below is PLACEHOLDER. Replace it with your real roles and projects.
+#
+# Why this file exists instead of letting the model rewrite your resume freely: tailoring selects entries from
+# here by id and may reword existing bullets, but it can never add a bullet, claim a technology you have not
+# listed, or introduce a number that was not already in the text. If a job needs something this bank cannot
+# support, you get a gap flag to approve -- not invented text. So the honesty of every generated resume is
+# exactly the honesty of this file.
+#
+# Rules that are enforced in code:
+#   - ids must be unique
+#   - every achievement needs at least one bullet
+#   - strength is 1-5 (your own view of how strong it is; breaks ties between equally relevant entries)
+#   - a reworded bullet may drop figures but never introduce new ones
+
+achievements:
+  - id: placeholder-current-role
+    kind: experience
+    title: Software Engineer
+    organization: Example Company
+    start_date: 2024-01
+    end_date: present
+    strength: 5
+    technologies: [python, fastapi, postgresql, docker]
+    bullets:
+      - Built and shipped REST APIs serving internal tooling, owning them from design through deployment.
+      - Added automated test coverage to a service that previously had none, reducing regressions on release.
+      - Containerised local development so new contributors could run the full stack without manual setup.
+
+  - id: placeholder-ai-project
+    kind: project
+    title: Retrieval-Augmented Question Answering Tool
+    url: https://github.com/your-handle/your-project
+    strength: 5
+    technologies: [python, llm, rag, langchain]
+    bullets:
+      - Built a retrieval-augmented pipeline that answers questions over a private document collection.
+      - Implemented chunking and embedding storage so answers cite the source passage they came from.
+      - Ran entirely on a local model, avoiding per-query API cost.
+
+  - id: placeholder-fullstack-project
+    kind: project
+    title: Full-Stack Web Application
+    url: https://github.com/your-handle/another-project
+    strength: 4
+    technologies: [typescript, react, next.js, node.js, mongodb]
+    bullets:
+      - Built a full-stack application with authentication, persistence and a responsive interface.
+      - Designed the data model and API routes, then consumed them from a React front end.
+      - Deployed the application and set up continuous deployment from the main branch.

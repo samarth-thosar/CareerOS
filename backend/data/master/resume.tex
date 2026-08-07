@@ -1,0 +1,54 @@
+% CareerOS master resume template -- PLACEHOLDER, replace with your real Overleaf document.
+%
+% How tailoring works: CareerOS never lets the model write LaTeX. It substitutes the four markers below with
+% content assembled deterministically from data/master/achievements.yaml. Everything outside the markers is
+% copied through untouched, so your formatting, packages and layout stay exactly as you wrote them.
+%
+% To use your own Overleaf resume:
+%   1. Paste your .tex here, replacing this file entirely.
+%   2. Delete the static content from the sections you want tailored, and drop the matching marker in its place.
+%   3. Keep every marker on its own line. Unrecognised markers are left alone; missing ones are simply not filled.
+%
+% Markers:
+%   %%CAREEROS:SUMMARY%%      one tailored paragraph
+%   %%CAREEROS:SKILLS%%       comma-separated skills, ordered for this job
+%   %%CAREEROS:EXPERIENCE%%   selected experience entries
+%   %%CAREEROS:PROJECTS%%     selected project entries
+
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=0.75in]{geometry}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage titlesec
+
+\titleformat{\section}{\large\bfseries}{}{0em}{}[\titlerule]
+\titlespacing{\section}{0pt}{10pt}{6pt}
+\setlist[itemize]{leftmargin=1.2em, itemsep=1pt, topsep=2pt}
+\pagestyle{empty}
+
+\begin{document}
+
+\begin{center}
+  {\LARGE \textbf{Your Name}} \\[2pt]
+  your.email@example.com $\cdot$ +00 00000 00000 $\cdot$
+  \href{https://github.com/your-handle}{github.com/your-handle} $\cdot$
+  \href{https://linkedin.com/in/your-handle}{linkedin.com/in/your-handle}
+\end{center}
+
+\section*{Summary}
+%%CAREEROS:SUMMARY%%
+
+\section*{Skills}
+%%CAREEROS:SKILLS%%
+
+\section*{Experience}
+%%CAREEROS:EXPERIENCE%%
+
+\section*{Projects}
+%%CAREEROS:PROJECTS%%
+
+\section*{Education}
+\textbf{Your Degree}, Your University \hfill 2020 -- 2024
+
+\end{document}

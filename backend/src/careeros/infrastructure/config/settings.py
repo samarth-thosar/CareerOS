@@ -51,6 +51,16 @@ class ScoringSettings(BaseModel):
     run_on_startup: bool = False
 
 
+class ResumeSettings(BaseModel):
+    """Resume tailoring and rendering.
+
+    `latex_engine` empty means "use whichever of tectonic/pdflatex/xelatex/lualatex is on PATH". With none
+    installed, tailoring still produces .tex and artifacts; only the PDF step is skipped.
+    """
+
+    latex_engine: str = ""
+
+
 class ProfileSettings(BaseModel):
     # Load config/profile.yaml into the database on boot. Off by default so a running system's profile -- which
     # Memory may have adjusted -- is never silently overwritten by a stale file.
@@ -122,6 +132,7 @@ class Settings(BaseSettings):
     discovery: DiscoverySettings = DiscoverySettings()
     tracker: TrackerSettings = TrackerSettings()
     profile: ProfileSettings = ProfileSettings()
+    resume: ResumeSettings = ResumeSettings()
 
     @classmethod
     def settings_customise_sources(

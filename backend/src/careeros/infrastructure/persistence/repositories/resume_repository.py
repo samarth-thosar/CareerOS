@@ -6,10 +6,21 @@ guarantee. See docs/architecture/01-domain-model.md.
 """
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from careeros.domain.resume.resume_version import CoverLetter, RenderStatus, ResumeVersion
-from careeros.infrastructure.persistence.models import CoverLetterModel, ResumeVersionModel
+from careeros.domain.resume.resume_version import (
+    CoverLetter,
+    GapFlagStatus,
+    RenderStatus,
+    ResumeGapFlag,
+    ResumeVersion,
+)
+from careeros.infrastructure.persistence.models import (
+    CoverLetterModel,
+    ResumeGapFlagModel,
+    ResumeVersionModel,
+)
 
 
 def _resume_to_domain(model: ResumeVersionModel) -> ResumeVersion:
@@ -72,6 +83,45 @@ class SqlAlchemyResumeRepository:
         model.render_status = resume_version.render_status.value
         model.pdf_path = resume_version.pdf_path
         model.has_gaps = resume_version.has_gaps
+
+    async def list_versions_for_job(self, job_id: str) -> list[ResumeVersion]:
+        """Every version generated for a job, newest first -- nothing is ever replaced, only added to."""
+        stmt = (
+            select(ResumeVersionModel)
+            .where(ResumeVersionModel.job_id == job_id)
+            .order_by(ResumeVersionModel.created_at.desc())
+        )
+        result = await self._session.execute(stmt)
+        return [_resume_to_domain(model) for model in result.scalars().all()]
+
+    async def add_gap_flag(self, gap_flag: ResumeGapFlag) -> None:
+        self._session.add(
+            ResumeGapFlagModel(
+                id=gap_flag.id,
+                resume_version_id=gap_flag.resume_version_id,
+                job_id=gap_flag.job_id,
+                missing_skill_or_requirement=gap_flag.missing_skill_or_requirement,
+                suggested_language=gap_flag.suggested_language,
+                status=gap_flag.status.value,
+            )
+        )
+
+    async def list_pending_gap_flags(self) -> list[ResumeGapFlag]:
+        stmt = select(ResumeGapFlagModel).where(
+            ResumeGapFlagModel.status == GapFlagStatus.PENDING_APPROVAL.value
+        )
+        result = await self._session.execute(stmt)
+        return [
+            ResumeGapFlag(
+                id=model.id,
+                resume_version_id=model.resume_version_id,
+                job_id=model.job_id,
+                missing_skill_or_requirement=model.missing_skill_or_requirement,
+                suggested_language=model.suggested_language,
+                status=GapFlagStatus(model.status),
+            )
+            for model in result.scalars().all()
+        ]
 
     async def get_cover_letter(self, cover_letter_id: str) -> CoverLetter | None:
         model = await self._session.get(CoverLetterModel, cover_letter_id)

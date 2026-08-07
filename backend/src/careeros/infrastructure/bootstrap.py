@@ -16,6 +16,7 @@ which is why handlers are written to be idempotent.
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -36,6 +37,7 @@ from careeros.application.services.company_resolver import CompanyResolver
 from careeros.application.services.cover_letter_service import CoverLetterService
 from careeros.application.services.discovery_service import DiscoveryService
 from careeros.application.services.memory_service import MemoryService
+from careeros.application.services.resume_manager_service import ResumeManagerService
 from careeros.application.services.scoring_service import DimensionWeights, ScoringService
 from careeros.domain.candidate.candidate_profile import CandidateProfile
 from careeros.domain.events import JobDiscovered, JobScored
@@ -46,6 +48,12 @@ from careeros.infrastructure.events.in_process_event_bus import InProcessEventBu
 from careeros.infrastructure.job_sources.greenhouse_provider import GreenhouseProvider
 from careeros.infrastructure.llm.ollama_provider import OllamaProvider
 from careeros.infrastructure.persistence.db import create_engine, create_session_factory, session_scope
+from careeros.domain.resume.achievement import AchievementBank
+from careeros.infrastructure.resume.achievement_loader import load_achievement_bank
+from careeros.infrastructure.resume.artifact_store import ArtifactStore as LocalArtifactStore
+from careeros.infrastructure.resume.latex_renderer import LatexRenderer
+from careeros.infrastructure.resume.local_tex_resume_source import LocalTexResumeSource
+from careeros.infrastructure.resume.tex_assembler import assemble_tex
 from careeros.infrastructure.persistence.repositories import (
     SqlAlchemyApplicationRepository,
     SqlAlchemyCandidateProfileRepository,
@@ -55,6 +63,8 @@ from careeros.infrastructure.persistence.repositories import (
     SqlAlchemyScoreRepository,
 )
 from careeros.infrastructure.scheduler.apscheduler_adapter import APSchedulerAdapter
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
@@ -105,6 +115,12 @@ class Container:
     llm_provider: OllamaProvider
     scheduler: APSchedulerAdapter
     job_source_providers: list[JobSourceProvider]
+    resume_source: LocalTexResumeSource
+    resume_renderer: LatexRenderer
+    artifact_store: LocalArtifactStore
+    # Loaded once at startup: the bank is a file the user edits between runs, not per-request state. A reload
+    # endpoint replaces it in place rather than each request re-reading YAML from disk.
+    achievement_bank: AchievementBank | None
 
 
 def search_criteria_from(settings: Settings) -> SearchCriteria:
@@ -151,15 +167,33 @@ def build_container() -> Container:
         ),
         scheduler=APSchedulerAdapter(),
         job_source_providers=build_job_source_providers(settings),
+        resume_source=LocalTexResumeSource(),
+        resume_renderer=LatexRenderer(engine=settings.resume.latex_engine or None),
+        artifact_store=LocalArtifactStore(),
+        achievement_bank=_load_bank_or_warn(),
     )
+
+
+def _load_bank_or_warn() -> AchievementBank | None:
+    """Load the achievement bank, tolerating its absence.
+
+    A missing or invalid bank disables tailoring but must not stop the app booting -- discovery, scoring and the
+    dashboard are all still useful, and the error is far easier to act on from a running system.
+    """
+    try:
+        return load_achievement_bank()
+    except Exception:
+        logger.exception("Could not load the achievement bank; resume tailoring will be unavailable")
+        return None
 
 
 @dataclass(slots=True)
 class Services:
     """Use-case services for a single unit of work, built against one session's repositories.
 
-    `ResumeManagerService` and `NotificationService` are absent until their ports have adapters (Phases 7
-    and 11); see docs/architecture/decisions/0005-zero-paid-services-constraint.md.
+    `resume_manager` is None when the achievement bank could not be loaded, since tailoring has nothing honest
+    to draw from without it. `NotificationService` is still absent pending its adapter; see
+    docs/architecture/decisions/0005-zero-paid-services-constraint.md.
     """
 
     discovery: DiscoveryService
@@ -168,6 +202,7 @@ class Services:
     candidate_profile: CandidateProfileService
     company_intelligence: CompanyIntelligenceService
     company_resolver: CompanyResolver
+    resume_manager: ResumeManagerService | None
     cover_letter: CoverLetterService
     memory: MemoryService
     command_dispatcher: CommandDispatcher
@@ -218,6 +253,25 @@ def build_services(container: Container, repos: Repositories, event_bus: EventBu
             id_generator=container.id_generator,
         ),
         company_resolver=company_resolver,
+        resume_manager=(
+            ResumeManagerService(
+                resume_repository=repos.resumes,
+                job_repository=repos.jobs,
+                company_repository=repos.companies,
+                candidate_profile_repository=repos.candidate_profile,
+                resume_source=container.resume_source,
+                achievement_bank=container.achievement_bank,
+                renderer=container.resume_renderer,
+                artifact_store=container.artifact_store,
+                assembler=assemble_tex,
+                llm_provider=container.llm_provider,
+                event_bus=event_bus,
+                clock=container.clock,
+                id_generator=container.id_generator,
+            )
+            if container.achievement_bank is not None
+            else None
+        ),
         cover_letter=CoverLetterService(
             resume_repository=repos.resumes,
             llm_provider=container.llm_provider,
