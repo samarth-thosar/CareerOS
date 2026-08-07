@@ -1,8 +1,8 @@
 """initial schema
 
-Revision ID: 420d04666095
+Revision ID: f189486fcd3f
 Revises: 
-Create Date: 2026-08-08 01:15:59.660429
+Create Date: 2026-08-08 02:09:09.307275
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '420d04666095'
+revision: str = 'f189486fcd3f'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -35,6 +35,7 @@ def upgrade() -> None:
     op.create_table('companies',
     sa.Column('id', sa.String(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
+    sa.Column('normalized_name', sa.String(), nullable=False),
     sa.Column('website', sa.String(), nullable=True),
     sa.Column('careers_page_url', sa.String(), nullable=True),
     sa.Column('linkedin_url', sa.String(), nullable=True),
@@ -47,6 +48,7 @@ def upgrade() -> None:
     sa.Column('version', sa.Integer(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_index(op.f('ix_companies_normalized_name'), 'companies', ['normalized_name'], unique=True)
     op.create_table('jobs',
     sa.Column('id', sa.String(), nullable=False),
     sa.Column('source', sa.String(), nullable=False),
@@ -193,6 +195,7 @@ def downgrade() -> None:
     op.drop_table('applications')
     op.drop_table('recruiter_contacts')
     op.drop_table('jobs')
+    op.drop_index(op.f('ix_companies_normalized_name'), table_name='companies')
     op.drop_table('companies')
     op.drop_table('candidate_profile')
     # ### end Alembic commands ###

@@ -6,7 +6,12 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from careeros.domain.company.company import Company, RecruiterContact, TimestampedNote
+from careeros.domain.company.company import (
+    Company,
+    RecruiterContact,
+    TimestampedNote,
+    normalize_company_name,
+)
 from careeros.infrastructure.persistence.models import CompanyModel, RecruiterContactModel
 
 
@@ -85,11 +90,20 @@ class SqlAlchemyCompanyRepository:
             return None
         return _to_domain(model, await self._get_contacts(model.id))
 
+    async def find_by_normalized_name(self, normalized_name: str) -> Company | None:
+        stmt = select(CompanyModel).where(CompanyModel.normalized_name == normalized_name)
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+        if model is None:
+            return None
+        return _to_domain(model, await self._get_contacts(model.id))
+
     async def add(self, company: Company) -> None:
         self._session.add(
             CompanyModel(
                 id=company.id,
                 name=company.name,
+                normalized_name=normalize_company_name(company.name),
                 website=company.website,
                 careers_page_url=company.careers_page_url,
                 linkedin_url=company.linkedin_url,
@@ -110,6 +124,7 @@ class SqlAlchemyCompanyRepository:
         if model is None:
             raise ValueError(f"Company {company.id} does not exist")
         model.name = company.name
+        model.normalized_name = normalize_company_name(company.name)
         model.website = company.website
         model.careers_page_url = company.careers_page_url
         model.linkedin_url = company.linkedin_url

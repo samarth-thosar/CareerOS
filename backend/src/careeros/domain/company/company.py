@@ -1,8 +1,25 @@
-"""The Company aggregate and its RecruiterContact entity."""
+"""The Company aggregate, its RecruiterContact entity, and company-name normalization."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
+
+_LEGAL_SUFFIXES = frozenset({"inc", "llc", "ltd", "limited", "corp", "corporation", "co", "gmbh", "bv", "plc"})
+_NON_ALPHANUMERIC = re.compile(r"[^a-z0-9]+")
+
+
+def normalize_company_name(name: str) -> str:
+    """Reduce a display name to a stable matching key.
+
+    "Stripe, Inc." and "stripe" both normalize to "stripe", so the same employer discovered through two
+    different job sources resolves to one Company rather than two. This is the deliberately simple first
+    heuristic -- fuzzy/domain-based matching is a Company Intelligence concern (Phase 5), and lives behind
+    `CompanyResolver` so it can be upgraded in one place.
+    """
+    tokens = [token for token in _NON_ALPHANUMERIC.split(name.lower()) if token]
+    meaningful = [token for token in tokens if token not in _LEGAL_SUFFIXES]
+    return " ".join(meaningful or tokens)
 
 
 @dataclass(slots=True)

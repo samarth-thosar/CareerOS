@@ -117,6 +117,19 @@ class Application:
     applied_at: datetime | None = None
     version: int = 0
 
+    @classmethod
+    def open(cls, *, id: str, job_id: str, at: datetime) -> "Application":
+        """Start tracking a newly discovered job, seeding the timeline with the Found state.
+
+        Every Application begins here, so its history always explains itself from discovery onward rather
+        than starting at whatever the first transition happened to be.
+        """
+        application = cls(id=id, job_id=job_id)
+        application.status_history.append(
+            ApplicationStatusEvent(from_status=None, to_status=ApplicationStatus.FOUND, changed_at=at)
+        )
+        return application
+
     def transition_to(
         self,
         new_status: ApplicationStatus,

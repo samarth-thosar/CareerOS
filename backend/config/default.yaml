@@ -22,10 +22,44 @@ feature_flags:
   auto_tailor_resume: true
   notification_batching_window_minutes: 60
 
-enabled_providers:
-  wellfound: true
-  greenhouse: false
-  lever: false
-  ashby: false
-  generic: false
-  linkedin: false
+job_sources:
+  greenhouse:
+    enabled: true
+    # Greenhouse publishes no cross-company search API, so name the companies to watch.
+    # A token is the slug in boards.greenhouse.io/<token>. Add your own targets here.
+    board_tokens:
+      - stripe
+      - anthropic
+      - figma
+
+discovery:
+  # Matched against the job TITLE only. This is the filter that matters: every job kept here later costs one
+  # local LLM call to score, so keeping it tight is the difference between minutes and hours of inference.
+  title_keywords:
+    - ai
+    - ml
+    - machine learning
+    - llm
+    - applied scientist
+    - backend
+    - back end
+    - python
+    - full stack
+    - fullstack
+    - frontend
+    - front end
+    - react
+    - node
+    - software engineer
+    - mobile
+    - flutter
+  # Matched anywhere including the description. Left empty on purpose -- almost every engineering description
+  # mentions "engineer", so adding broad terms here re-introduces the noise title_keywords just removed.
+  keywords: []
+  remote_only: false
+  interval_seconds: 21600
+  run_on_startup: false
+
+tracker:
+  # Score at or above this promotes an application from Found to Interested automatically.
+  auto_interested_threshold: 70

@@ -37,13 +37,37 @@ class FeatureFlags(BaseModel):
     notification_batching_window_minutes: int = 60
 
 
-class EnabledProviders(BaseModel):
-    wellfound: bool = True
-    greenhouse: bool = False
-    lever: bool = False
-    ashby: bool = False
-    generic: bool = False
-    linkedin: bool = False
+class GreenhouseSettings(BaseModel):
+    """Greenhouse has no cross-company search API, so discovery is driven by an explicit board list.
+
+    A board token is the slug in `boards.greenhouse.io/<token>` for a company you want to watch.
+    """
+
+    enabled: bool = True
+    board_tokens: list[str] = []
+
+
+class JobSourceSettings(BaseModel):
+    greenhouse: GreenhouseSettings = GreenhouseSettings()
+
+
+class DiscoverySettings(BaseModel):
+    """What discovery looks for, and how often.
+
+    Prefer `title_keywords` for narrowing: every kept job later costs one local LLM call to score, so a loose
+    description-wide filter turns straight into hours of inference. See `SearchCriteria` for the tradeoff.
+    """
+
+    title_keywords: list[str] = []
+    keywords: list[str] = []
+    remote_only: bool = False
+    interval_seconds: int = 21_600  # 6 hours; ATS boards do not change minute to minute.
+    run_on_startup: bool = False
+
+
+class TrackerSettings(BaseModel):
+    # Below this score an Application stays at Found rather than being promoted to Interested.
+    auto_interested_threshold: int = 70
 
 
 def _yaml_config_source(path: Path) -> dict[str, Any]:
@@ -67,7 +91,9 @@ class Settings(BaseSettings):
     scoring_weights: ScoringWeights = ScoringWeights()
     llm: LLMSettings = LLMSettings()
     feature_flags: FeatureFlags = FeatureFlags()
-    enabled_providers: EnabledProviders = EnabledProviders()
+    job_sources: JobSourceSettings = JobSourceSettings()
+    discovery: DiscoverySettings = DiscoverySettings()
+    tracker: TrackerSettings = TrackerSettings()
 
     @classmethod
     def settings_customise_sources(

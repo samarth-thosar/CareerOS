@@ -21,6 +21,9 @@ class CompanyModel(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
+    # Derived from `name` by the repository via domain.company.normalize_company_name; unique so the same
+    # employer seen through two job sources cannot become two Company rows.
+    normalized_name: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     website: Mapped[str | None] = mapped_column(String, nullable=True)
     careers_page_url: Mapped[str | None] = mapped_column(String, nullable=True)
     linkedin_url: Mapped[str | None] = mapped_column(String, nullable=True)
