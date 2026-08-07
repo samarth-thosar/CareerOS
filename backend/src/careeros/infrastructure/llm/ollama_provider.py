@@ -61,7 +61,9 @@ class OllamaProvider:
             "keep_alive": self._keep_alive,
             "options": {
                 "temperature": prompt.temperature,
-                "num_predict": self._max_output_tokens,
+                # The prompt decides its own budget when it knows it needs more than the default; truncation
+                # here shows up as unparseable JSON, which is easy to misread as the model misbehaving.
+                "num_predict": prompt.max_output_tokens or self._max_output_tokens,
             },
         }
         if prompt.response_schema is not None:
@@ -79,6 +81,15 @@ class OllamaProvider:
 
         text = _strip_thinking(body.get("message", {}).get("content", ""))
         parsed = _parse_json(text) if prompt.response_schema is not None else None
+
+        if parsed is None and body.get("done_reason") == "length":
+            # Distinguish "ran out of output budget" from "produced nonsense"; they look identical downstream
+            # but only one is fixed by raising PromptSpec.max_output_tokens.
+            logger.warning(
+                "Model output hit the %d-token limit and was truncated; raise max_output_tokens for this prompt",
+                prompt.max_output_tokens or self._max_output_tokens,
+            )
+
         return LLMResponse(text=text, parsed=parsed, model_used=self._model)
 
 

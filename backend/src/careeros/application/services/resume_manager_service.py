@@ -18,7 +18,6 @@ the user explicitly keeps for themselves.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,6 +26,7 @@ from careeros.application.ports.clock import Clock
 from careeros.application.ports.event_bus import EventBus
 from careeros.application.ports.id_generator import IdGenerator
 from careeros.application.ports.llm_provider import LLMProvider
+from careeros.application.ports.resume_assembler import ResumeAssembler
 from careeros.application.ports.resume_renderer import ResumeRenderer
 from careeros.application.ports.resume_source import ResumeSource
 from careeros.application.prompts.tailoring_prompt import (
@@ -56,9 +56,6 @@ class TailoringResponseError(ValueError):
     """Raised when the model's tailoring response is structurally unusable."""
 
 
-TexAssembler = Callable[[str, TailoringPlan, AchievementBank], str]
-"""Renders a validated plan into LaTeX. Injected so the document format is replaceable without touching this
-service -- a Markdown or HTML assembler would satisfy the same signature."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,7 +78,7 @@ class ResumeManagerService:
         achievement_bank: AchievementBank,
         renderer: ResumeRenderer,
         artifact_store: ArtifactStore,
-        assembler: TexAssembler,
+        assembler: ResumeAssembler,
         llm_provider: LLMProvider,
         event_bus: EventBus,
         clock: Clock,
@@ -114,6 +111,7 @@ class ResumeManagerService:
         company_name = company.name if company else "unknown"
 
         master = await self._resume_source.fetch_master()
+        self._warn_about_template(master.content)
         prompt = build_tailoring_prompt(job, company_name, profile, self._achievement_bank)
         response = await self._llm_provider.complete(prompt)
         if response.parsed is None:
@@ -123,7 +121,7 @@ class ResumeManagerService:
         # Raises on any unsupported id, bullet index, skill, or invented figure.
         validate_plan(plan, self._achievement_bank, profile.skills)
 
-        tailored_tex = self._assembler(master.content, plan, self._achievement_bank)
+        tailored_tex = self._assembler.assemble(master.content, plan, self._achievement_bank)
 
         now = self._clock.now()
         directory = self._artifact_store.allocate(
@@ -180,6 +178,21 @@ class ResumeManagerService:
             pdf_unavailable=render.unavailable,
             gap_count=len(plan.gaps),
         )
+
+    def _warn_about_template(self, master_tex: str) -> None:
+        """Report a misconfigured master template instead of silently producing a wrong document.
+
+        A missing marker just leaves that section empty; a duplicated one fills both occurrences, which for a
+        multi-line block escapes any surrounding LaTeX comment and injects a stray copy of the section.
+        """
+        issues = self._assembler.check_template(master_tex)
+        if issues.missing:
+            logger.warning("Master resume has no %s marker(s); those sections will be empty", issues.missing)
+        if issues.duplicated:
+            logger.warning(
+                "Master resume repeats %s marker(s); content will be duplicated in the output",
+                issues.duplicated,
+            )
 
     async def list_pending_gaps(self) -> list[ResumeGapFlag]:
         """Gaps awaiting the candidate's decision -- content the bank could not support for some job."""
@@ -300,10 +313,54 @@ def _plan_from(parsed: dict) -> TailoringPlan:
 
         selections.append(AchievementSelection(achievement_id=str(entry["id"]).strip(), bullets=bullets))
 
-    skills = [str(skill).strip() for skill in (parsed.get("skills") or []) if str(skill).strip()]
-    gaps = [str(gap).strip() for gap in (parsed.get("gaps") or []) if str(gap).strip()]
+    skills = _dedupe_preserving_order(
+        str(skill).strip() for skill in (parsed.get("skills") or []) if str(skill).strip()
+    )
+    gaps = _dedupe_preserving_order(
+        str(gap).strip() for gap in (parsed.get("gaps") or []) if str(gap).strip()
+    )
     summary = str(parsed.get("summary") or "").strip() or None
-    return TailoringPlan(achievements=selections, skills=skills, summary=summary, gaps=gaps)
+    return TailoringPlan(
+        achievements=_merge_duplicate_selections(selections),
+        skills=skills,
+        summary=summary,
+        gaps=gaps,
+    )
+
+
+def _dedupe_preserving_order(values) -> list[str]:
+    seen: dict[str, None] = {}
+    for value in values:
+        seen.setdefault(value, None)
+    return list(seen)
+
+
+def _merge_duplicate_selections(selections: list[AchievementSelection]) -> list[AchievementSelection]:
+    """Fold repeated selections of the same achievement into one, unioning their bullets.
+
+    Models do this routinely -- naming a role twice to attach different bullets to each mention. It is a
+    structural slip, not a fabrication attempt: the content is all still from the bank, it would just appear
+    twice on the page. Treating it as fabrication would throw away an otherwise valid tailoring, so it is
+    normalised here instead, while `validate_plan` stays strict about claims that genuinely are unsupported.
+
+    Bullet order and first-seen achievement order are preserved. Where the same bullet appears twice, a version
+    with a rewording wins over one without, since the model chose to adapt it.
+    """
+    merged: dict[str, dict[int, BulletSelection]] = {}
+    for selection in selections:
+        bullets = merged.setdefault(selection.achievement_id, {})
+        for bullet in selection.bullets:
+            existing = bullets.get(bullet.source_index)
+            if existing is None or (existing.rephrased is None and bullet.rephrased is not None):
+                bullets[bullet.source_index] = bullet
+
+    if len(merged) < len(selections):
+        logger.info("Merged %d duplicate achievement selections", len(selections) - len(merged))
+
+    return [
+        AchievementSelection(achievement_id=achievement_id, bullets=list(bullets.values()))
+        for achievement_id, bullets in merged.items()
+    ]
 
 
 def _diff_summary(plan: TailoringPlan, bank: AchievementBank) -> str:

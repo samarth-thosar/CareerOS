@@ -194,3 +194,28 @@ class TestReworkDetection:
 
     def test_genuine_change_is_a_rewording(self) -> None:
         assert BulletSelection(0, rephrased="Designed APIs.").is_rewording("Built APIs.") is True
+
+    def test_stripping_bold_markers_is_not_a_rewording(self) -> None:
+        # Regression: qwen3 echoed every bullet back with **emphasis** removed. That is a formatting loss, not
+        # an edit, and treating it as one discarded the emphasis from the generated resume.
+        selection = BulletSelection(0, rephrased="Built an AI-powered platform.")
+
+        assert selection.is_rewording("Built an **AI-powered platform**.") is False
+
+    def test_bold_is_preserved_when_the_model_strips_it(self) -> None:
+        original = "Built an **AI-powered platform**."
+        selection = BulletSelection(0, rephrased="Built an AI-powered platform.")
+
+        assert selection.render(original) == original
+
+    def test_a_real_edit_still_wins_over_the_original(self) -> None:
+        original = "Building an **AI-powered platform**."
+        selection = BulletSelection(0, rephrased="Built an AI-powered platform.")
+
+        assert selection.is_rewording(original) is True
+        assert selection.render(original) == "Built an AI-powered platform."
+
+    def test_added_emphasis_alone_is_not_a_rewording(self) -> None:
+        selection = BulletSelection(0, rephrased="Built an **AI-powered** platform.")
+
+        assert selection.is_rewording("Built an AI-powered platform.") is False

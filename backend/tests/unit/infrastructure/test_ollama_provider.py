@@ -14,7 +14,9 @@ from careeros.infrastructure.llm.ollama_provider import LLMRequestError, OllamaP
 SCHEMA = {"type": "object", "properties": {"score": {"type": "integer"}}, "required": ["score"]}
 
 
-def _client_returning(content: str, status_code: int = 200) -> tuple[type[httpx.AsyncClient], list[dict]]:
+def _client_returning(
+    content: str, status_code: int = 200, done_reason: str | None = None
+) -> tuple[type[httpx.AsyncClient], list[dict]]:
     """Stub client returning `content`, plus a list that captures the request bodies sent."""
     captured: list[dict] = []
 
@@ -24,7 +26,10 @@ def _client_returning(content: str, status_code: int = 200) -> tuple[type[httpx.
         captured.append(json.loads(request.content))
         if status_code != 200:
             return httpx.Response(status_code, json={"error": "boom"})
-        return httpx.Response(200, json={"message": {"role": "assistant", "content": content}})
+        body: dict = {"message": {"role": "assistant", "content": content}}
+        if done_reason is not None:
+            body["done_reason"] = done_reason
+        return httpx.Response(200, json=body)
 
     class StubClient(httpx.AsyncClient):
         def __init__(self, **kwargs) -> None:
@@ -64,6 +69,35 @@ class TestRequestShaping:
         await provider.complete(_prompt())
 
         assert "think" not in captured[0]
+
+    async def test_prompt_output_budget_overrides_the_provider_default(self) -> None:
+        # Regression: one global cap suited scoring and silently truncated tailoring into unparseable JSON.
+        client, captured = _client_returning('{"score": 70}')
+        provider = OllamaProvider("http://x", "m", max_output_tokens=800, client_factory=client)
+
+        await provider.complete(
+            PromptSpec(system_prompt="s", user_prompt="u", response_schema=SCHEMA, max_output_tokens=3000)
+        )
+
+        assert captured[0]["options"]["num_predict"] == 3000
+
+    async def test_provider_default_applies_when_the_prompt_sets_no_budget(self) -> None:
+        client, captured = _client_returning('{"score": 70}')
+        provider = OllamaProvider("http://x", "m", max_output_tokens=800, client_factory=client)
+
+        await provider.complete(_prompt())
+
+        assert captured[0]["options"]["num_predict"] == 800
+
+    async def test_truncated_output_is_logged_as_a_budget_problem(self, caplog) -> None:
+        client, _ = _client_returning('{"summary": "cut off mid-str', done_reason="length")
+        provider = OllamaProvider("http://x", "m", client_factory=client)
+
+        with caplog.at_level("WARNING"):
+            response = await provider.complete(_prompt())
+
+        assert response.parsed is None
+        assert any("truncated" in record.message for record in caplog.records)
 
     async def test_schema_is_forwarded_as_the_format_constraint(self) -> None:
         client, captured = _client_returning('{"score": 70}')

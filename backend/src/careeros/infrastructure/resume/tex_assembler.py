@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 
+from careeros.application.ports.resume_assembler import TemplateIssues
 from careeros.domain.resume.achievement import AchievementBank, AchievementKind
 from careeros.domain.resume.tailoring import TailoringPlan
 
@@ -37,6 +38,12 @@ _LATEX_ESCAPES: dict[str, str] = {
 
 _ESCAPE_PATTERN = re.compile("|".join(re.escape(character) for character in _LATEX_ESCAPES))
 
+# Markdown-style bold in bank content. Applied *after* escaping: `*` is not a LaTeX special character, so the
+# markers survive escaping untouched and can then be turned into real markup. This gives the candidate the
+# emphasis their handwritten resume had, without letting arbitrary LaTeX through -- `**` is the only markup
+# the bank can express, and everything else stays inert.
+_BOLD_MARKUP = re.compile(r"\*\*(.+?)\*\*", re.DOTALL)
+
 
 def escape_latex(text: str) -> str:
     """Make arbitrary text safe to typeset. Bank content is trusted-ish, but never trusted as markup.
@@ -49,27 +56,32 @@ def escape_latex(text: str) -> str:
     return _ESCAPE_PATTERN.sub(lambda match: _LATEX_ESCAPES[match.group()], text)
 
 
+def render_text(text: str) -> str:
+    """Escape text, then honour the one markup form bank content may use: **bold**."""
+    return _BOLD_MARKUP.sub(r"\\textbf{\1}", escape_latex(text))
+
+
 def _render_entry(achievement, bullets: list[str]) -> str:
     """One experience/project block: a bold heading, optional metadata, then an itemize of its bullets."""
     heading = f"\\textbf{{{escape_latex(achievement.title)}}}"
     if achievement.organization:
-        heading += f", {escape_latex(achievement.organization)}"
+        heading += f", \\textbf{{{escape_latex(achievement.organization)}}}"
 
     dates = " -- ".join(
         escape_latex(part) for part in (achievement.start_date, achievement.end_date) if part
     )
     if dates:
-        heading += f" \\hfill {dates}"
+        heading += f" \\hfill \\textbf{{{dates}}}"
 
-    lines = [heading + " \\\\"]
+    lines = [heading]
     if achievement.technologies:
-        lines.append(f"\\textit{{{escape_latex(', '.join(achievement.technologies))}}} \\\\")
+        lines.append(f"\\\\ \\textit{{{escape_latex(', '.join(achievement.technologies))}}}")
     if achievement.url:
         # url is emitted unescaped inside \url{}, which handles special characters itself.
-        lines.append(f"\\url{{{achievement.url}}} \\\\")
+        lines.append(f"\\\\ \\url{{{achievement.url}}}")
 
     lines.append("\\begin{itemize}")
-    lines.extend(f"  \\item {escape_latex(bullet)}" for bullet in bullets)
+    lines.extend(f"  \\item {render_text(bullet)}" for bullet in bullets)
     lines.append("\\end{itemize}")
     return "\n".join(lines)
 
@@ -95,7 +107,7 @@ def assemble_tex(master_tex: str, plan: TailoringPlan, bank: AchievementBank) ->
             project_blocks.append(block)
 
     replacements = {
-        MARKERS["summary"]: escape_latex(plan.summary) if plan.summary else "",
+        MARKERS["summary"]: render_text(plan.summary) if plan.summary else "",
         MARKERS["skills"]: escape_latex(", ".join(plan.skills)) if plan.skills else "",
         MARKERS["experience"]: "\n\n\\vspace{4pt}\n".join(experience_blocks),
         MARKERS["projects"]: "\n\n\\vspace{4pt}\n".join(project_blocks),
@@ -110,3 +122,24 @@ def assemble_tex(master_tex: str, plan: TailoringPlan, bank: AchievementBank) ->
 def missing_markers(master_tex: str) -> list[str]:
     """Markers absent from the template, so a misconfigured master can be reported rather than silently thin."""
     return [marker for marker in MARKERS.values() if marker not in master_tex]
+
+
+def duplicated_markers(master_tex: str) -> list[str]:
+    """Markers appearing more than once, which silently duplicates content.
+
+    Worth checking separately from `missing_markers` because the failure is much nastier than a thin section:
+    substitution fills every occurrence, so a marker written inside a LaTeX comment gets filled too, and a
+    multi-line replacement escapes the comment after its first line and injects a stray copy of the section
+    into the rendered document.
+    """
+    return [marker for marker in MARKERS.values() if master_tex.count(marker) > 1]
+
+
+class TexAssembler:
+    """The LaTeX implementation of the ResumeAssembler port."""
+
+    def assemble(self, master: str, plan: TailoringPlan, bank: AchievementBank) -> str:
+        return assemble_tex(master, plan, bank)
+
+    def check_template(self, master: str) -> TemplateIssues:
+        return TemplateIssues(missing=missing_markers(master), duplicated=duplicated_markers(master))

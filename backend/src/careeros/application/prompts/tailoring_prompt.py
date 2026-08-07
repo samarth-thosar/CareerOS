@@ -19,6 +19,10 @@ TAILORING_STRATEGY_VERSION = "1.0.0"
 
 MAX_DESCRIPTION_CHARS = 6_000
 
+# Generous because the response repeats every selected bullet, and bullets are long. Truncation surfaces as
+# unparseable JSON, so under-budgeting here is worse than over-budgeting.
+MAX_OUTPUT_TOKENS = 3_000
+
 RESPONSE_SCHEMA: dict = {
     "type": "object",
     "properties": {
@@ -61,6 +65,9 @@ Hard rules -- violating any of these makes your whole response unusable:
 - If you reword a bullet, you may shorten it, re-emphasise it, or change wording to match the job's language.
   You may NOT add facts, and you may NOT introduce any number, percentage or metric that is not already in the
   original bullet. Omit "rephrased" entirely to use the original text unchanged.
+- Bullets use **double asterisks** for emphasis. Keep those markers on the same key terms when you reword, and
+  do not add emphasis to new terms. If you are not actually changing the wording, omit "rephrased" rather than
+  echoing the sentence back.
 
 What to produce:
 - achievements: the entries worth including for THIS job, most relevant first, each with the bullets to show
@@ -124,4 +131,7 @@ def build_tailoring_prompt(
         response_schema=RESPONSE_SCHEMA,
         # Slightly above zero: rewording benefits from a little flexibility, selection is constrained anyway.
         temperature=0.2,
+        # Tailoring echoes selected bullets back, so its output scales with the bank. The default budget
+        # suits scoring and silently truncated this response into unparseable JSON.
+        max_output_tokens=MAX_OUTPUT_TOKENS,
     )

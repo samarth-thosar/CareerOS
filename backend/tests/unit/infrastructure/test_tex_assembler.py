@@ -11,8 +11,10 @@ from careeros.domain.resume.tailoring import AchievementSelection, BulletSelecti
 from careeros.infrastructure.resume.tex_assembler import (
     MARKERS,
     assemble_tex,
+    duplicated_markers,
     escape_latex,
     missing_markers,
+    render_text,
 )
 
 TEMPLATE = f"""\\documentclass{{article}}
@@ -74,6 +76,34 @@ class TestEscaping:
 
     def test_braces_are_escaped_so_injected_commands_are_inert(self) -> None:
         assert escape_latex(r"\input{/etc/passwd}") == r"\textbackslash{}input\{/etc/passwd\}"
+
+
+class TestBoldMarkup:
+    """`**bold**` is the only markup bank content may express, so hand-written emphasis survives."""
+
+    def test_bold_markers_become_textbf(self) -> None:
+        assert render_text("Built an **AI-powered platform** end to end.") == (
+            r"Built an \textbf{AI-powered platform} end to end."
+        )
+
+    def test_multiple_bold_spans_are_converted(self) -> None:
+        assert render_text("**Frontend** and **backend**.") == r"\textbf{Frontend} and \textbf{backend}."
+
+    def test_percent_inside_bold_is_still_escaped(self) -> None:
+        # Escaping runs first, so LaTeX specials remain inert even inside emphasis.
+        assert render_text("Cut time by **70%**.") == r"Cut time by \textbf{70\%}."
+
+    def test_latex_injection_inside_bold_stays_inert(self) -> None:
+        rendered = render_text(r"**\input{/etc/passwd}**")
+
+        assert r"\input{" not in rendered
+        assert r"\textbackslash{}input" in rendered
+
+    def test_unpaired_marker_is_left_alone(self) -> None:
+        assert render_text("A ** dangling marker") == "A ** dangling marker"
+
+    def test_text_without_markup_is_unchanged_apart_from_escaping(self) -> None:
+        assert render_text("Plain text with 50% margin.") == r"Plain text with 50\% margin."
 
 
 class TestAssembly:
@@ -144,9 +174,21 @@ class TestMarkerDiagnostics:
 
         assert missing_markers(stripped) == [MARKERS["projects"]]
 
-    def test_the_shipped_master_template_has_every_marker(self) -> None:
+    def test_duplicated_markers_are_reported(self) -> None:
+        doubled = TEMPLATE + f"\n% docs mention {MARKERS['experience']} here\n"
+
+        assert duplicated_markers(doubled) == [MARKERS["experience"]]
+
+    def test_clean_template_reports_no_duplicates(self) -> None:
+        assert duplicated_markers(TEMPLATE) == []
+
+    def test_the_shipped_master_template_has_every_marker_exactly_once(self) -> None:
+        # Regression: the header comment originally listed the markers literally, so every section was
+        # substituted twice -- and multi-line experience blocks escaped the comment, duplicating a section
+        # into the rendered document.
         from careeros.infrastructure.resume.local_tex_resume_source import DEFAULT_MASTER_RESUME_PATH
 
         content = DEFAULT_MASTER_RESUME_PATH.read_text(encoding="utf-8")
 
         assert missing_markers(content) == []
+        assert duplicated_markers(content) == []

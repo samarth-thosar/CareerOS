@@ -12,10 +12,19 @@ from typing import Any, Protocol
 
 @dataclass(slots=True)
 class PromptSpec:
+    """A model-agnostic request.
+
+    `max_output_tokens` belongs here rather than only on the adapter because output budgets are task-specific:
+    a scoring response is six integers and a short narrative, while a tailoring response carries a summary, a
+    skills list and every selected bullet. One global cap either truncates the long task or lets the short one
+    ramble. None means "use the provider's default".
+    """
+
     system_prompt: str
     user_prompt: str
     response_schema: dict[str, Any] | None = None
     temperature: float = 0.2
+    max_output_tokens: int | None = None
 
 
 @dataclass(slots=True)

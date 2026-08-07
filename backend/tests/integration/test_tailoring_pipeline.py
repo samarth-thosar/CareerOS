@@ -12,16 +12,69 @@ import pytest
 
 from careeros.application.ports.job_source_provider import RawJobPosting, SearchCriteria
 from careeros.application.ports.llm_provider import LLMResponse
+from careeros.domain.candidate.candidate_profile import CandidateProfile
 from careeros.domain.job.job import Location, RemoteType, SalaryRange
-from careeros.domain.resume.achievement import UnknownAchievementError, UnknownBulletError
+from careeros.domain.resume.achievement import (
+    Achievement,
+    AchievementBank,
+    AchievementKind,
+    UnknownAchievementError,
+    UnknownBulletError,
+)
 from careeros.domain.resume.resume_version import RenderStatus
 from careeros.domain.resume.tailoring import FabricationError
 from careeros.infrastructure.bootstrap import Container, build_container, in_session
-from careeros.infrastructure.config.profile_loader import load_profile
 from careeros.infrastructure.persistence.models import Base
 from careeros.infrastructure.resume.artifact_store import ArtifactStore
 from tests.fakes.fake_job_source_provider import FakeJobSourceProvider
 from tests.fakes.fake_llm_provider import FakeLLMProvider
+
+# Deliberately a fixture bank and profile rather than the shipped data/master + config/profile.yaml. Those are
+# the user's own content and change freely; coupling assertions to them would make editing a resume break the
+# test suite.
+TEST_BANK = AchievementBank(
+    achievements=[
+        Achievement(
+            id="test-role",
+            kind=AchievementKind.EXPERIENCE,
+            title="Backend Engineer",
+            organization="Testing Co",
+            start_date="2024-01",
+            end_date="present",
+            technologies=["python", "fastapi"],
+            bullets=[
+                "Built REST APIs serving internal tooling.",
+                "Added automated test coverage to an untested service.",
+                "Containerised local development for new contributors.",
+            ],
+        ),
+        Achievement(
+            id="test-ai-project",
+            kind=AchievementKind.PROJECT,
+            title="Retrieval Augmented QA Tool",
+            technologies=["llm", "rag"],
+            bullets=[
+                "Built a retrieval-augmented pipeline over a private document collection.",
+                "Implemented chunking and embedding storage with source citations.",
+            ],
+        ),
+        Achievement(
+            id="test-fullstack-project",
+            kind=AchievementKind.PROJECT,
+            title="Full-Stack Web Application",
+            technologies=["react", "mongodb"],
+            bullets=["Built a full-stack application with authentication and persistence."],
+        ),
+    ]
+)
+
+TEST_PROFILE = CandidateProfile(
+    id="candidate",
+    headline="Software Engineer",
+    summary="Builds backend and AI systems.",
+    years_experience=2,
+    skills=["python", "react", "postgresql"],
+)
 
 
 def _posting() -> RawJobPosting:
@@ -40,19 +93,19 @@ def _posting() -> RawJobPosting:
 
 
 def _tailoring_response(**overrides) -> FakeLLMProvider:
-    """A scripted selection over the shipped placeholder achievement bank."""
+    """A scripted selection over TEST_BANK."""
     parsed = {
         "summary": "Backend engineer focused on Python services.",
         "skills": ["python", "fastapi", "postgresql"],
         "achievements": [
             {
-                "id": "placeholder-current-role",
+                "id": "test-role",
                 "bullets": [
                     {"source_index": 0, "rephrased": "Built and shipped REST APIs end to end."},
                     {"source_index": 1},
                 ],
             },
-            {"id": "placeholder-ai-project", "bullets": [{"source_index": 0}]},
+            {"id": "test-ai-project", "bullets": [{"source_index": 0}]},
         ],
         "gaps": ["Kubernetes experience"],
     }
@@ -70,7 +123,8 @@ async def container(tmp_path, monkeypatch) -> Container:
     # Artifacts go to a temp dir so tests never touch the real data/applications folder.
     built.artifact_store = ArtifactStore(root=tmp_path / "applications")
     built.llm_provider = _tailoring_response()
-    await in_session(built, lambda s: s.candidate_profile.replace(load_profile()))
+    built.achievement_bank = TEST_BANK
+    await in_session(built, lambda s: s.candidate_profile.replace(TEST_PROFILE))
     try:
         yield built
     finally:
@@ -115,7 +169,7 @@ class TestSuccessfulTailoring:
         tex = (outcome.artifact_directory / "resume.tex").read_text(encoding="utf-8")
 
         assert "Built and shipped REST APIs end to end." in tex  # reworded bullet
-        assert "Retrieval-Augmented Question Answering Tool" in tex  # selected project
+        assert "Retrieval Augmented QA Tool" in tex  # selected project
         assert "Full-Stack Web Application" not in tex  # not selected
         assert "%%CAREEROS:" not in tex  # every marker substituted
         assert tex.strip().endswith("\\end{document}")
@@ -127,8 +181,8 @@ class TestSuccessfulTailoring:
         selection = json.loads((outcome.artifact_directory / "selection.json").read_text(encoding="utf-8"))
 
         assert [entry["id"] for entry in selection["achievements"]] == [
-            "placeholder-current-role",
-            "placeholder-ai-project",
+            "test-role",
+            "test-ai-project",
         ]
         assert selection["gaps"] == ["Kubernetes experience"]
         assert selection["master_version_ref"].startswith("local:")
@@ -156,6 +210,53 @@ class TestSuccessfulTailoring:
             assert versions[0].render_status is RenderStatus.DRAFT
             assert versions[0].pdf_path is None
         assert (outcome.artifact_directory / "resume.tex").exists()
+
+
+class TestNormalisesModelSloppiness:
+    """Structural slips that keep content supported are repaired, not treated as fabrication."""
+
+    async def test_duplicate_achievement_selections_are_merged(self, container: Container) -> None:
+        job_id = await _discover(container)
+        container.llm_provider = _tailoring_response(
+            achievements=[
+                {"id": "test-role", "bullets": [{"source_index": 0}]},
+                {"id": "test-role", "bullets": [{"source_index": 2}]},
+            ]
+        )
+
+        outcome = await in_session(container, lambda s: s.resume_manager.tailor_for_job(job_id))
+        selection = json.loads((outcome.artifact_directory / "selection.json").read_text(encoding="utf-8"))
+
+        assert [entry["id"] for entry in selection["achievements"]] == ["test-role"]
+        assert [b["source_index"] for b in selection["achievements"][0]["bullets"]] == [0, 2]
+
+    async def test_repeated_bullet_prefers_the_reworded_version(self, container: Container) -> None:
+        job_id = await _discover(container)
+        container.llm_provider = _tailoring_response(
+            achievements=[
+                {"id": "test-role", "bullets": [{"source_index": 0}]},
+                {"id": "test-role", "bullets": [{"source_index": 0, "rephrased": "Shipped REST APIs."}]},
+            ]
+        )
+
+        outcome = await in_session(container, lambda s: s.resume_manager.tailor_for_job(job_id))
+        tex = (outcome.artifact_directory / "resume.tex").read_text(encoding="utf-8")
+
+        assert "Shipped REST APIs." in tex
+        assert tex.count("Shipped REST APIs.") == 1
+
+    async def test_duplicate_skills_and_gaps_are_deduplicated(self, container: Container) -> None:
+        job_id = await _discover(container)
+        container.llm_provider = _tailoring_response(
+            skills=["python", "python", "react"], gaps=["Kubernetes", "Kubernetes"]
+        )
+
+        outcome = await in_session(container, lambda s: s.resume_manager.tailor_for_job(job_id))
+        selection = json.loads((outcome.artifact_directory / "selection.json").read_text(encoding="utf-8"))
+
+        assert selection["skills"] == ["python", "react"]
+        assert selection["gaps"] == ["Kubernetes"]
+        assert outcome.gap_count == 1
 
 
 class TestNeverOverwrites:
@@ -188,7 +289,7 @@ class TestRefusesToFabricate:
     async def test_invented_bullet_index_produces_no_resume(self, container: Container) -> None:
         job_id = await _discover(container)
         container.llm_provider = _tailoring_response(
-            achievements=[{"id": "placeholder-ai-project", "bullets": [{"source_index": 99}]}]
+            achievements=[{"id": "test-ai-project", "bullets": [{"source_index": 99}]}]
         )
 
         with pytest.raises(UnknownBulletError):
@@ -199,7 +300,7 @@ class TestRefusesToFabricate:
         container.llm_provider = _tailoring_response(
             achievements=[
                 {
-                    "id": "placeholder-current-role",
+                    "id": "test-role",
                     "bullets": [
                         {"source_index": 0, "rephrased": "Built APIs serving 10,000 requests per second."}
                     ],

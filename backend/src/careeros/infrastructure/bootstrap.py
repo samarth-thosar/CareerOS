@@ -53,7 +53,7 @@ from careeros.infrastructure.resume.achievement_loader import load_achievement_b
 from careeros.infrastructure.resume.artifact_store import ArtifactStore as LocalArtifactStore
 from careeros.infrastructure.resume.latex_renderer import LatexRenderer
 from careeros.infrastructure.resume.local_tex_resume_source import LocalTexResumeSource
-from careeros.infrastructure.resume.tex_assembler import assemble_tex
+from careeros.infrastructure.resume.tex_assembler import TexAssembler
 from careeros.infrastructure.persistence.repositories import (
     SqlAlchemyApplicationRepository,
     SqlAlchemyCandidateProfileRepository,
@@ -263,7 +263,7 @@ def build_services(container: Container, repos: Repositories, event_bus: EventBu
                 achievement_bank=container.achievement_bank,
                 renderer=container.resume_renderer,
                 artifact_store=container.artifact_store,
-                assembler=assemble_tex,
+                assembler=TexAssembler(),
                 llm_provider=container.llm_provider,
                 event_bus=event_bus,
                 clock=container.clock,

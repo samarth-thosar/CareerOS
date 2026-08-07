@@ -19,6 +19,15 @@ from careeros.domain.resume.achievement import AchievementBank
 # Matches integers, decimals, percentages and comma-grouped figures, ignoring surrounding words.
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
 
+# Bank bullets carry **bold** emphasis. Models routinely echo a bullet back with the markers stripped, which
+# is not a rewording at all -- it is the same sentence with the formatting lost. Comparing bold-insensitively
+# lets those be recognised as no-ops so the original (emphasis intact) is used instead.
+_BOLD_MARKERS = re.compile(r"\*\*")
+
+
+def _without_bold(text: str) -> str:
+    return _BOLD_MARKERS.sub("", text).strip()
+
 
 class FabricationError(ValueError):
     """Raised when a tailoring selection would put unsupported content on a resume."""
@@ -32,17 +41,23 @@ class BulletSelection:
     rephrased: str | None = None
 
     def render(self, original: str) -> str:
-        return self.rephrased if self.rephrased else original
+        """The text to put on the resume.
+
+        Falls back to the original whenever the rephrasing changes nothing of substance, which also restores
+        the **bold** emphasis a model commonly drops when echoing a bullet back.
+        """
+        return self.rephrased if self.is_rewording(original) else original
 
     def is_rewording(self, original: str) -> bool:
-        """Whether this actually changes the text.
+        """Whether this actually changes the wording.
 
-        Models frequently echo the original back in `rephrased`. The raw response is still recorded verbatim
-        for auditability, but a diff that labels unchanged text "reworded" hides the changes that do matter.
+        Compared bold-insensitively and whitespace-insensitively, because models frequently return the
+        original sentence with emphasis markers stripped. That is a formatting loss, not an edit -- treating
+        it as one would both discard the emphasis and bury genuine changes in a noisy diff.
         """
         if not self.rephrased:
             return False
-        return self.rephrased.strip() != original.strip()
+        return _without_bold(self.rephrased) != _without_bold(original)
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,6 +106,9 @@ def validate_plan(plan: TailoringPlan, bank: AchievementBank, claimable_skills: 
     seen_ids: set[str] = set()
     for selection in plan.achievements:
         if selection.achievement_id in seen_ids:
+            # Should be unreachable: duplicates are folded together during parsing, since repeating a supported
+            # achievement is a structural slip rather than a fabricated claim. Kept as a guard so the invariant
+            # still holds if a plan ever reaches here unnormalised.
             raise FabricationError(f"Achievement {selection.achievement_id!r} selected more than once")
         seen_ids.add(selection.achievement_id)
 

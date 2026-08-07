@@ -1,21 +1,29 @@
 # Your career profile -- the "who am I" that every job is scored against.
 #
-# This file is the seed. It is loaded into the database (POST /profile/reload, or on startup when
-# profile.seed_on_startup is true), and from then on the database copy is what scoring reads -- so the Memory
-# module has somewhere durable to record learned adjustments without fighting this file.
+# Populated from resume-current.tex. This file is the seed: it is loaded into the database
+# (POST /profile/reload), and from then on the database copy is what scoring reads -- so the Memory module has
+# somewhere durable to record learned adjustments without fighting this file.
 #
 # Nothing here is secret, so it is committed. Credentials belong in .env.
-# Re-run the reload after editing.
 
-headline: Software Engineer
+headline: Full Stack Developer (AI / LLM systems)
+
 summary: >
-  Replace this with two or three sentences describing your actual experience: the kind of systems you have
-  built, the stack you are strongest in, and the scale or impact you can speak to. Scoring quotes this when
-  judging seniority and career progression, so vague text here produces vague reasoning.
+  Full Stack Developer at CloudMotiv building AI-powered platforms end to end: a document intelligence
+  product that turns PDFs into structured insights, an ML-based drone health monitoring system with
+  predictive maintenance, and StackIQ, a harness-level AI/SaaS utilization diagnostic for Claude. Previously
+  shipped React Native modules at Syngenta used in apps serving 3M+ growers, and co-authored two IEEE
+  publications plus a paper under review at ACM CHI. B.Tech in Computer Engineering from VIT Pune (CGPA
+  8.64/10), comfortable across Python/TypeScript backends, React and React Native front ends, and
+  LLM/RAG workflows.
 
+# NOTE: this counts substantial internship work (Revogreen Sep 2022, VIT research Jun 2024, Syngenta Jan-Jul
+# 2025) alongside the current full-time role from Nov 2025. Full-time-only would read closer to 1.
+# This number materially moves career_progression_fit on every score, so change it to whatever you would
+# actually tell a recruiter.
 years_experience: 2
 
-# Ranked 1-5, the same star ratings you gave. Role fit is scored against these, so the ranking is data --
+# Ranked 1-5, matching the star ratings you gave. Role fit is scored against these, so your ranking is data --
 # the model is never left to guess what you want.
 role_interests:
   - { title: AI Automation Engineer, priority: 5 }
@@ -33,36 +41,83 @@ role_interests:
   - { title: React Native Developer, priority: 4 }
   - { title: Flutter Developer, priority: 4 }
 
-# What you can actually claim. Keep this honest -- it is the basis for skill-fit scoring, and later for
-# resume tailoring, which must never assert a skill that is not here.
+# What you can actually claim, taken from the Skills Summary table on your resume. This is the basis for
+# skill-fit scoring and, more importantly, the allowlist for resume tailoring -- nothing outside this list
+# (or the technologies in achievements.yaml) can appear on a generated resume.
 skills:
+  # Languages
   - python
+  - c++
+  - java
+  - c
   - typescript
   - javascript
+  - sql
+  - dart
+  - r
+  - html/css
+  - latex
+  # Frameworks
+  - react native
   - react
-  - next.js
+  - flutter
   - node.js
-  - fastapi
-  - mongodb
-  - postgresql
-  - docker
-  - git
+  - express
+  - redux
+  - spring boot
+  - django
+  # Libraries / ML
+  - tensorflow
+  - pytorch
+  - opencv
+  - scikit-learn
+  - numpy
+  - pandas
+  - matplotlib
+  - nltk
+  - machine learning
   - llm
   - rag
-  - langchain
+  - generative ai
+  # DevOps & cloud
+  - docker
+  - kubernetes
+  - jenkins
+  - mlflow
+  - git
+  - github
+  - ci/cd
+  - firebase
+  - aws
+  - gcp
+  # Databases
+  - postgresql
+  - mysql
+  - mongodb
+  - realm
+  # Tools & platforms
+  - figma
+  - jira
+  - anthropic claude api
+  - mcp
+  - claude code
+  - npm
 
 preferences:
   # One of: remote, hybrid, onsite, any
   remote_preference: remote
-  # Annual, in the currency you think in. Jobs below this lose points rather than being discarded, since most
-  # postings do not publish pay at all.
+  # Annual, in the currency you think in. Left unset because you have not given a figure -- jobs then score
+  # salary_fit as "unknown" (50) rather than being penalised. Set it and low-paying roles start losing points.
   salary_floor: null
   preferred_locations:
     - Remote
     - India
+    - Pune
+    - Hyderabad
   # Broad areas used for skill-area fit scoring.
   target_skill_areas:
     - ai
+    - llm
     - backend
     - frontend
     - fullstack

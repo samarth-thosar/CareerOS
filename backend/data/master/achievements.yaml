@@ -1,51 +1,172 @@
 # THE ACHIEVEMENT BANK -- the only content a tailored resume may draw from.
 #
-# Everything below is PLACEHOLDER. Replace it with your real roles and projects.
+# Transcribed verbatim from resume-current.tex. Nothing here was invented or embellished: every bullet is a
+# statement already on the resume, with \textbf{...} converted to **...** (the one markup form the bank
+# supports; it renders as bold and nothing else can get through).
 #
-# Why this file exists instead of letting the model rewrite your resume freely: tailoring selects entries from
-# here by id and may reword existing bullets, but it can never add a bullet, claim a technology you have not
-# listed, or introduce a number that was not already in the text. If a job needs something this bank cannot
-# support, you get a gap flag to approve -- not invented text. So the honesty of every generated resume is
-# exactly the honesty of this file.
-#
-# Rules that are enforced in code:
-#   - ids must be unique
-#   - every achievement needs at least one bullet
-#   - strength is 1-5 (your own view of how strong it is; breaks ties between equally relevant entries)
+# Enforced in code:
+#   - ids must be unique; every achievement needs at least one bullet; strength is 1-5
+#   - tailoring may only select ids and bullet indices that exist here
 #   - a reworded bullet may drop figures but never introduce new ones
+#   - claimed skills must appear in config/profile.yaml or in a technologies list below
+#
+# So the honesty of every generated resume is exactly the honesty of this file. Add new work here as it
+# happens; that is also how you clear the gap flags CareerOS raises.
+#
+# YAML note: bullets use block scalars (`>-`) rather than plain or quoted strings. Plain scalars break on this
+# content -- a "word: **bold**" sequence makes YAML read a mapping whose value starts with `*`, which it then
+# treats as an alias reference and rejects. Block scalars need no escaping at all, so apostrophes, colons,
+# quotes and asterisks are all safe.
 
 achievements:
-  - id: placeholder-current-role
+  # ---------------- WORK EXPERIENCE ----------------
+
+  - id: cloudmotiv-fullstack
     kind: experience
-    title: Software Engineer
-    organization: Example Company
-    start_date: 2024-01
-    end_date: present
+    title: Full Stack Developer
+    organization: CloudMotiv
+    start_date: Nov 2025
+    end_date: Present
     strength: 5
-    technologies: [python, fastapi, postgresql, docker]
+    technologies: [python, typescript, aws, llm, machine learning, react, node.js]
     bullets:
-      - Built and shipped REST APIs serving internal tooling, owning them from design through deployment.
-      - Added automated test coverage to a service that previously had none, reducing regressions on release.
-      - Containerised local development so new contributors could run the full stack without manual setup.
+      - >-
+        Developed an **AI-powered document intelligence platform** capable of analyzing **PDF documents** and
+        automatically generating structured insights such as summaries, analytical notes, and report-style
+        outputs.
+      - >-
+        Architected and implemented both **frontend** and **backend** infrastructure, building scalable
+        document ingestion and processing pipelines for efficient information extraction.
+      - >-
+        Integrated **AWS authentication services** and deployment pipelines to ensure secure, scalable user
+        access while optimizing **LLM-based workflows** to reduce operational costs.
+      - >-
+        Building an **AI-powered drone health monitoring system** with **predictive maintenance
+        capabilities**, developing **machine learning models** for diagnosis, prognosis, and automated alert
+        management with interactive dashboards for real-time fleet monitoring.
+      - >-
+        Built **StackIQ**, a **harness-level AI/SaaS utilization diagnostic** for **Claude (Cowork / Claude
+        Code)**: a **5-stage, read-then-act pipeline** (4 read-only stages, 1 human-gated action stage) that
+        finds idle seats, tier mismatches, duplicate tools, orphaned accounts, and shadow IT; sizes findings
+        in **dollars, seats, or accounts**; and ships an **Excel workbook** plus a **CEO-level deck**.
 
-  - id: placeholder-ai-project
-    kind: project
-    title: Retrieval-Augmented Question Answering Tool
-    url: https://github.com/your-handle/your-project
+  - id: syngenta-intern
+    kind: experience
+    title: Software Engineering Intern
+    organization: Syngenta Services Pvt Ltd
+    start_date: Jan 2025
+    end_date: July 2025
     strength: 5
-    technologies: [python, llm, rag, langchain]
+    technologies: [react native, redux, javascript, realm, jira]
     bullets:
-      - Built a retrieval-augmented pipeline that answers questions over a private document collection.
-      - Implemented chunking and embedding storage so answers cite the source passage they came from.
-      - Ran entirely on a local model, avoiding per-query API cost.
+      - >-
+        Developed, maintained, and improved **React Native modules** for **Smart Agrolite**, leveraging
+        **Redux-Saga**, **Realm DB**, and **Async Storage**.
+      - >-
+        Designed and implemented a **dynamic, reusable NPM package** for the **Plantix feature**; conducted
+        extensive documentation via **JIRA**, **Confluence**, and README.md.
+      - >-
+        Collaborated in an **Agile environment**, contributing to code reviews, bug fixes, sprint planning,
+        and feedback sessions.
 
-  - id: placeholder-fullstack-project
-    kind: project
-    title: Full-Stack Web Application
-    url: https://github.com/your-handle/another-project
+  - id: vit-research-intern
+    kind: experience
+    title: Research Intern, Department of Computer Engineering
+    organization: VIT Pune
+    start_date: Jun 2024
+    end_date: Aug 2024
     strength: 4
-    technologies: [typescript, react, next.js, node.js, mongodb]
+    technologies: [research, mobile app development]
     bullets:
-      - Built a full-stack application with authentication, persistence and a responsive interface.
-      - Designed the data model and API routes, then consumed them from a React front end.
-      - Deployed the application and set up continuous deployment from the main branch.
+      - >-
+        Co-developed **"NeoNate Mom"**, a **medical health platform** supporting over **1,000+ mothers** of
+        preterm infants with health tracking, alerts, and discussion forums.
+      - >-
+        Co-authored a research paper, currently **under review at the ACM CHI Conference on Human Factors in
+        Computing Systems** (Tier-1 in Human-Computer Interaction).
+
+  - id: revogreen-intern
+    kind: experience
+    title: Software Project Intern
+    organization: Revogreen Technologies
+    start_date: Sep 2022
+    end_date: Jan 2023
+    strength: 3
+    technologies: [flutter, dart, figma]
+    bullets:
+      - >-
+        Engineered **Bluetooth-based data communication features and UI** from scratch in the **Smart Shunt
+        mobile app** built using **Flutter**.
+      - >-
+        Managed the entire product flow from **Figma-based UI/UX design** to deployment, completing the
+        project within a tight timeline.
+
+  # ---------------- PROJECTS ----------------
+
+  - id: stackiq-project
+    kind: project
+    title: "StackIQ: AI/SaaS Utilization Diagnostic Harness for Claude"
+    start_date: Nov 2025
+    end_date: Present
+    strength: 5
+    technologies: [python, llm, anthropic claude api, mcp, claude code]
+    bullets:
+      - >-
+        Built a harness-level diagnostic for **Claude (Cowork / Claude Code)** auditing AI/SaaS usage --
+        **idle seats, tier mismatches, duplicate tools, orphaned accounts, and shadow IT**.
+      - >-
+        Architected a **5-stage, read-then-act pipeline**: stages 1-4 read-only, stage 5 executes only
+        pre-approved fixes behind a **hard human-approval gate**.
+      - >-
+        Sized every finding in **dollars, seats, or accounts**; shipped as an **Excel workbook** and
+        **CEO-level deck**.
+
+  - id: sceneit-project
+    kind: project
+    title: "SceneIt: AI-based Prompt-Driven Video Editing Tool"
+    start_date: Jun 2025
+    end_date: Present
+    strength: 5
+    technologies: [python, llm, generative ai]
+    bullets:
+      - >-
+        Built an **AI-powered video editing platform** allowing users to edit videos via natural language
+        prompts.
+      - >-
+        Automated tasks such as **trimming, transitions, overlays, and effects** through text-to-action
+        parsing.
+      - >-
+        Reduced manual editing time by over **70%** and provided creative suggestions using generative AI.
+
+  - id: plantix-package-project
+    kind: project
+    title: React Native Syngenta Plantix Package
+    start_date: Jan 2025
+    end_date: July 2025
+    strength: 4
+    technologies: [react native, redux, realm, npm, javascript]
+    bullets:
+      - >-
+        Pioneered a modular **React Native library** enabling Plantix (AI-powered crop disease
+        identification).
+      - >-
+        Designed dynamic, reusable feature packages supporting cross-app deployment in Syngenta's global
+        apps, including **Cropwise Grower (3M+ users)**.
+
+  - id: ieee-app-project
+    kind: project
+    title: IEEE App -- IEEE VIT Pune Student Branch
+    start_date: Jan 2024
+    end_date: Apr 2024
+    strength: 3
+    technologies: [flutter, dart, firebase, google play console]
+    bullets:
+      - >-
+        Worked as part of a 5-member team to design and deploy a **Flutter app** for event and community
+        engagement.
+      - >-
+        Integrated **QR-based attendance**, **Firebase backend**, and **YouTube API** for resources and
+        quizzes.
+      - >-
+        Deployed successfully on the **Google Play Console**; streamlined member interaction and event
+        tracking.

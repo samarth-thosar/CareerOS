@@ -1,54 +1,173 @@
-% CareerOS master resume template -- PLACEHOLDER, replace with your real Overleaf document.
+%------------------------
+% CareerOS master resume template
 %
-% How tailoring works: CareerOS never lets the model write LaTeX. It substitutes the four markers below with
-% content assembled deterministically from data/master/achievements.yaml. Everything outside the markers is
-% copied through untouched, so your formatting, packages and layout stay exactly as you wrote them.
+% This is Samarth's real resume with four substitution markers added. Everything outside the markers is copied
+% through verbatim on every tailoring run, so the layout, packages and hand-written sections (Publications,
+% Skills table, Leadership, Education) stay exactly as authored.
 %
-% To use your own Overleaf resume:
-%   1. Paste your .tex here, replacing this file entirely.
-%   2. Delete the static content from the sections you want tailored, and drop the matching marker in its place.
-%   3. Keep every marker on its own line. Unrecognised markers are left alone; missing ones are simply not filled.
+% Four markers are filled from data/master/achievements.yaml by a validated selection. Each is the marker name
+% below wrapped in double percent signs, and each must appear EXACTLY ONCE in this file -- which is why they
+% are named indirectly here rather than written out. (Writing one literally in a comment makes substitution
+% happen here too, and since experience blocks span several lines, everything after the first line escapes the
+% comment and duplicates a whole section into the document.)
+%   CAREEROS:SUMMARY      one tailored paragraph positioning you for the specific role
+%   CAREEROS:SKILLS       the subset of your skills most relevant to this job, ordered
+%   CAREEROS:EXPERIENCE   selected work-experience entries and bullets
+%   CAREEROS:PROJECTS     selected project entries and bullets
 %
-% Markers:
-%   %%CAREEROS:SUMMARY%%      one tailored paragraph
-%   %%CAREEROS:SKILLS%%       comma-separated skills, ordered for this job
-%   %%CAREEROS:EXPERIENCE%%   selected experience entries
-%   %%CAREEROS:PROJECTS%%     selected project entries
+% Deliberately unchanged from the original except:
+%   - the four markers replace the previously static Work Experience / Projects lists
+%   - a Summary section was added (it was commented out in the original) since a per-job summary is one of the
+%     highest-value things tailoring can do
+%   - a "Most relevant for this role" line was added above the Skills table rather than replacing it: the
+%     hand-written categorised table is better than a flat generated list, so it survives untouched
+%   - the biblatex package and \addbibresource were removed. Publications are listed manually below, so
+%     biblatex produced no output while making the document fail to build without own-bib.bib present.
+%
+% The original, untouched file is kept at the repository root as resume-current.tex.
+%------------------------
+\documentclass{article}
+\usepackage{url}
+\usepackage{parskip}
 
-\documentclass[11pt,a4paper]{article}
+%other packages for formatting
+\RequirePackage{color}
+\usepackage{soul}
 
-\usepackage[margin=0.75in]{geometry}
+\RequirePackage{graphicx}
+\usepackage[usenames,dvipsnames]{xcolor}
+\usepackage[scale=0.9]{geometry}
+
+%tabularx environment
+\usepackage{tabularx}
+
+%for lists within the experience section
 \usepackage{enumitem}
-\usepackage[hidelinks]{hyperref}
-\usepackage titlesec
 
-\titleformat{\section}{\large\bfseries}{}{0em}{}[\titlerule]
-\titlespacing{\section}{0pt}{10pt}{6pt}
-\setlist[itemize]{leftmargin=1.2em, itemsep=1pt, topsep=2pt}
-\pagestyle{empty}
+% centered version of 'X' col. type
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+
+%to prevent spillover of tabular into next pages
+\usepackage{supertabular}
+\usepackage{tabularx}
+\newlength{\fullcollw}
+\setlength{\fullcollw}{0.47\textwidth}
+
+%custom \section
+\usepackage{titlesec}
+\usepackage{multicol}
+\usepackage{multirow}
+
+%http://stefano.italians.nl/archives/26
+\titleformat{\section}{\large\scshape\raggedright}{}{0em}{}[\titlerule]
+\titlespacing{\section}{0pt}{4pt}{4pt}
+
+%Setup hyperref package, and colours for links
+\usepackage[unicode, draft=false]{hyperref}
+\definecolor{linkcolour}{rgb}{0,0.2,0.6}
+\hypersetup{colorlinks,breaklinks,urlcolor=linkcolour,linkcolor=linkcolour}
+
+%for social icons
+\usepackage{fontawesome5}
 
 \begin{document}
 
+\pagestyle{empty}
 \begin{center}
-  {\LARGE \textbf{Your Name}} \\[2pt]
-  your.email@example.com $\cdot$ +00 00000 00000 $\cdot$
-  \href{https://github.com/your-handle}{github.com/your-handle} $\cdot$
-  \href{https://linkedin.com/in/your-handle}{linkedin.com/in/your-handle}
+    \textbf{\Huge{Samarth Shekhar Thosar}} \\[8pt]
+    \faMobile* \ \href{tel:+917887911070}{+91 7887911070} \textbar\
+    \faEnvelope \ \href{mailto:samarth.thosar194@gmail.com}{samarth.thosar194@gmail.com} \textbar\
+    \faLinkedin \ \href{https://linkedin.com/in/samarth-thosar}{samarth-thosar} \textbar\
+    \faGithub \ \href{https://github.com/samarth-thosar}{samarth-thosar} \textbar\
+    \faGraduationCap \ \href{https://scholar.google.com/citations?user=GROqtyIAAAAJ&hl}{Google Scholar}
 \end{center}
 
-\section*{Summary}
+\section{Profile Summary}
 %%CAREEROS:SUMMARY%%
 
-\section*{Skills}
-%%CAREEROS:SKILLS%%
-
-\section*{Experience}
+\vspace{10pt}
+\section{Work Experience}
+\vspace{4pt}
 %%CAREEROS:EXPERIENCE%%
 
-\section*{Projects}
+\section{Publications}
+\begin{enumerate}
+
+    \item \textbf{S. Thosar}, R. Bharadwaj, S. Ratnaparkhi, R. Rajpurohit, K. Rahate, and R. Pandita,
+    “\textit{Deepfake Detection for Preventing Audio and Video Frauds using Advanced Deep Learning Techniques},”
+    in \textit{Proc. of 2023 International Conference on Integrated Intelligence and Communication Systems (ICIICIS)},
+    IEEE, Nov. 2023, pp. 1–7.
+    DOI: \url{https://doi.org/10.1109/ICAICCIT60255.2023.10465762}
+    \textit{(Indexed in Scopus)}
+
+    \item \textbf{S. Thosar}, K. Ingale, S. Vaze, V. Uttarwar, S. Urane, and T. Mahajan,
+    “\textit{Battlefield Health Surveillance with Soldier Tracking: A Privacy-Preserving Encrypted Approach},”
+    in \textit{Proc. of 2023 International Conference on Advances in Computation, Communication and Information Technology (ICAICCIT)},
+    IEEE, Nov. 2023, pp. 896–903.
+    DOI: \url{https://doi.org/10.1109/ICIICS59993.2023.10421486}
+    \textit{(Indexed in Scopus)}
+
+\end{enumerate}
+
+
+\section{Skills Summary}
+\small
+\textbf{Most relevant for this role:} %%CAREEROS:SKILLS%%
+\vspace{4pt}
+
+\renewcommand{\arraystretch}{0.8}
+\begin{tabular}{p{4.8cm}p{13.5cm}}
+  \textbf{Programming Languages:} & Python, C++, Java, C, TypeScript, SQL, Dart, R, JavaScript, HTML/CSS, LaTeX \\
+  \textbf{Frameworks:} & React Native, ReactJS, Flutter, Node.js, Express.js, Redux, Spring Boot, Django \\
+  \textbf{Libraries:} & TensorFlow, PyTorch, OpenCV, Scikit-learn, NumPy, Pandas, Matplotlib, NLTK \\
+  \textbf{DevOps \& Deployment:} & Docker, Kubernetes, Jenkins, MLFlow, Git, GitHub, CI/CD Pipelines, Firebase, AWS, GCP \\
+  \textbf{Databases:} & PostgreSQL, MySQL, MongoDB, Realm, Firebase Firestore \\
+  \textbf{Tools \& Platforms:} & Figma, JIRA, Anthropic Claude API, MCP, Claude Code, Claude Cowork, Agent Skills \\
+  \textbf{Core Competencies:} & Problem Solving, Leadership, Team Management, Research Communication, Public Speaking, Collaboration, Time Management, Agile/Scrum, Initiative, Documentation \\
+  \textbf{Areas of Interest:} & Mobile App Development, Cross-platform Development, AI/ML, Research \\
+\end{tabular}
+
+
+\section{Selected Technical Projects}
+\small
 %%CAREEROS:PROJECTS%%
 
-\section*{Education}
-\textbf{Your Degree}, Your University \hfill 2020 -- 2024
+
+%-----------LEADERSHIP, INVOLVEMENT, AND CERTIFICATIONS-----------------
+\section{Leadership, Involvement, and Certifications}
+\small
+\begin{itemize}[leftmargin=*, itemsep=1pt, topsep=1pt]
+
+  \item \textbf{IEEE Student Branch, VIT Pune} \emph{(2021 -- 2024)}:
+  Progressed from \textbf{Executive Committee Member} to \textbf{Project Head}. Contributed as part of the App Team, developing and maintaining multiple projects while mentoring peers in app development. Conducted internal coding sessions and organized hands-on workshops to strengthen technical knowledge within the branch.
+
+  \item \textbf{App Team Leadership:}
+  As Project Head, guided and mentored 35 executive committee members in Flutter, app development, and open-source practices. Structured a workshop-based learning model with weekly tasks, identified top performers, and formed a core app team to build the official IEEE SB mobile application. Supervised two additional industry projects under the team’s portfolio.
+
+  \item \textbf{DevOps Workshop Instructor:}
+  Served as a technical instructor for a large-scale DevOps workshop, delivering hands-on sessions to over 60 participants covering Docker, CI/CD, Kubernetes, and cloud deployment fundamentals.
+
+  \item \textbf{Hacktoberfest Contributor \& Mentor} \emph{(2022 -- 2023)}:
+  Achieved \textbf{Level 4 Contributor} for two consecutive years by making consistent open-source contributions. Later introduced and mentored IEEE members in contributing to open source, helping many achieve their first successful PRs.
+
+  \item \textbf{Student Council, VIT Pune} \emph{(2023 -- 2024)}:
+  Served as \textbf{Finance Coordinator}, managing event budgets, vendor coordination, and financial documentation for major campus events. Collaborated closely with faculty and management to ensure smooth execution of college-wide initiatives.
+
+  \item \textbf{Certifications:}
+  Earned the \textbf{IBM Full Stack Software Development Specialization (Coursera)} — a comprehensive 15-course program covering front-end, back-end, DevOps, and cloud deployment workflows. Additional certifications in Machine Learning, Deep Learning, and Data Analysis using Python.
+
+  \item \textbf{Anthropic Certifications:}
+  Completed 5 Anthropic certifications — \textbf{Introduction to Model Context Protocol}, \textbf{Claude with the Anthropic API}, \textbf{Introduction to Agent Skills}, \textbf{Claude Code in Action}, and \textbf{AI Fluency: Framework \& Foundations}.
+
+\end{itemize}
+
+\section{Education}
+\begin{tabularx}{\linewidth}{@{}l X r@{}}
+2021 -- 2025 & \textbf{B.Tech in Computer Engineering}, Vishwakarma Institute of Technology (VIT), Pune & \textit{CGPA: 8.64/10.0} \\
+& \textbf{Relevant Coursework:} Data Structures and Algorithms, Operating Systems, Database Management Systems, Artificial Intelligence, Machine Learning, Computer Networks & \\
+\\
+2020 -- 2021 & \textbf{Higher Secondary Education (HSC)}, Deogiri College, Aurangabad & \textit{Percentage: 93.33\%} \\
+2018 -- 2019 & \textbf{Class 10\textsuperscript{th}}, Stepping Stones High School, Aurangabad (CBSE) & \textit{Percentage: 87.60\%} \\
+\end{tabularx}
 
 \end{document}

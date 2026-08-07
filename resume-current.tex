@@ -1,0 +1,325 @@
+%------------------------
+% CV Template
+% Author : Ananya Kulkarni
+%------------------------
+\documentclass{article}
+\usepackage{url}
+\usepackage{parskip}
+
+%other packages for formatting
+\RequirePackage{color}
+\usepackage{soul}
+
+\RequirePackage{graphicx}
+\usepackage[usenames,dvipsnames]{xcolor}
+\usepackage[scale=0.9]{geometry}
+
+%tabularx environment
+\usepackage{tabularx}
+
+%for lists within the experience section
+\usepackage{enumitem}
+
+% centered version of 'X' col. type
+\newcolumntype{C}{>{\centering\arraybackslash}X} 
+
+%to prevent spillover of tabular into next pages
+\usepackage{supertabular}
+\usepackage{tabularx}
+\newlength{\fullcollw}
+\setlength{\fullcollw}{0.47\textwidth}
+
+%custom \section
+\usepackage{titlesec}				
+\usepackage{multicol}
+\usepackage{multirow}
+
+%http://stefano.italians.nl/archives/26
+\titleformat{\section}{\large\scshape\raggedright}{}{0em}{}[\titlerule]
+\titlespacing{\section}{0pt}{4pt}{4pt}
+
+%for publications
+\usepackage[backend=biber,style=ieee]{biblatex}
+\addbibresource{own-bib.bib}
+
+%Setup hyperref package, and colours for links
+\usepackage[unicode, draft=false]{hyperref}
+\definecolor{linkcolour}{rgb}{0,0.2,0.6}
+\hypersetup{colorlinks,breaklinks,urlcolor=linkcolour,linkcolor=linkcolour}
+\setlength\bibitemsep{0.4em}
+
+% \DeclareNameFormat{author}{%
+%   \ifstrequal{#1}{Kulkarni}{\textbf{\textcolor{blue}{#1}}}{#1}%
+%   \ifblank{#3}{\relax}{~#3}%
+%   \ifblank{#4}{\relax}{~#4}%
+% }
+
+
+%for social icons
+\usepackage{fontawesome5}
+
+\begin{document}
+
+% non-numbered pages
+% \pagestyle{empty} 
+% \begin{minipage}{0.75\textwidth}
+%    \begin{flushleft}
+%         \textbf{\Huge{Samarth Shekhar Thosar}} \\[8pt]
+%     \faMobile* \ \href{tel:+91 7887911070}{+91 7887911070} \quad
+%     \faEnvelope \ \href{mailto:samarth.thosar194@gmail.com}{samarth.thosar194@gmail.com} \quad
+%     \faLinkedin \ \href{https://www.linkedin.com/in/samarth-thosar/}{samarth-thosar/} \\[4pt]
+%     \faGithub \ \href{https://github.com/samarth-thosar}{samarth-thosar} \quad
+%     % \faMedium \ \href{https://medium.com/@ananyakulkarni1203}{ananyakulkarni1203} \quad
+%     \faGraduationCap \ \href{https://scholar.google.com/citations?user=GddubbUAAAAJ}{Google Scholar}
+%    \end{flushleft}
+% \end{minipage}%
+% \hspace{15mm}
+% \begin{minipage}{0.09\textwidth}
+%     \begin{flushright}
+%         \scalebox{0.07}{\includegraphics{Photo.jpg}} 
+%     \end{flushright}
+% \end{minipage}
+\pagestyle{empty}
+\begin{center}
+    \textbf{\Huge{Samarth Shekhar Thosar}} \\[8pt]
+    \faMobile* \ \href{tel:+917887911070}{+91 7887911070} \textbar\ 
+    \faEnvelope \ \href{mailto:samarth.thosar194@gmail.com}{samarth.thosar194@gmail.com} \textbar\ 
+    \faLinkedin \ \href{https://linkedin.com/in/samarth-thosar}{samarth-thosar} \textbar\ 
+    \faGithub \ \href{https://github.com/samarth-thosar}{samarth-thosar} \textbar\ 
+    \faGraduationCap \ \href{https://scholar.google.com/citations?user=GROqtyIAAAAJ&hl}{Google Scholar}
+\end{center}
+
+% \section{Profile Summary}
+% Passionate about using \textbf{Machine Learning} and \textbf{Deep Learning} for real-world challenges in \textbf{autonomous systems}, \textbf{scientific research}, and \textbf{accessibility}. Currently at \textbf{iHub-Data, IIIT Hyderabad}, I work on \textbf{real-time computer vision systems} for \textbf{adverse weather perception}. My background includes research internships at \textbf{ISRO} and \textbf{DIAT, DRDO}, where I focused on \textbf{climate modeling} and \textbf{time-series sensor analysis} for detecting leaks. Additionally, I contributed to a \textbf{low-cost, real-time Braille converter}, which garnered recognition and led to a \textbf{publication} and a \textbf{patent}. My interests include \textbf{computer vision}, \textbf{robust perception}, and \textbf{lightweight models} for \textbf{socially impactful AI applications}.
+
+\vspace{10pt}
+\section{Work Experience}
+\vspace{4pt}
+\begin{itemize}
+  \setlength\itemsep{1pt} % tighter spacing between experiences
+    \item \textbf{Full Stack Developer, CloudMotiv} \hfill \textbf{Nov 2025 -- Present}
+  \begin{itemize}
+    \setlength\itemsep{0pt}
+    \item Developed an \textbf{AI-powered document intelligence platform} capable of analyzing \textbf{PDF documents} and automatically generating structured insights such as summaries, analytical notes, and report-style outputs.
+    \item Architected and implemented both \textbf{frontend} and \textbf{backend} infrastructure, building scalable document ingestion and processing pipelines for efficient information extraction.
+    \item Integrated \textbf{AWS authentication services} and deployment pipelines to ensure secure, scalable user access while optimizing \textbf{LLM-based workflows} to reduce operational costs.
+    \item Building an \textbf{AI-powered drone health monitoring system} with \textbf{predictive maintenance capabilities}, developing \textbf{machine learning models} for diagnosis, prognosis, and automated alert management with interactive dashboards for real-time fleet monitoring.
+    \item Built \textbf{StackIQ}, a \textbf{harness-level AI/SaaS utilization diagnostic} for \textbf{Claude (Cowork / Claude Code)}: a \textbf{5-stage, read-then-act pipeline} (4 read-only stages, 1 human-gated action stage) that finds idle seats, tier mismatches, duplicate tools, orphaned accounts, and shadow IT; sizes findings in \textbf{dollars, seats, or accounts}; and ships an \textbf{Excel workbook} plus a \textbf{CEO-level deck}.
+\end{itemize}
+  \item \textbf{Software Engineering Intern, Syngenta Services Pvt Ltd} \hfill \textbf{Jan 2025 -- July 2025}
+  \begin{itemize}
+    \setlength\itemsep{0pt} % no extra space between bullet points
+    \item Developed, maintained, and improved \textbf{React Native modules} for \textbf{Smart Agrolite}, leveraging \textbf{Redux-Saga}, \textbf{Realm DB}, and \textbf{Async Storage}.
+    \item Designed and implemented a \textbf{dynamic, reusable NPM package} for the \textbf{Plantix feature}; conducted extensive documentation via \textbf{JIRA}, \textbf{Confluence}, and \texttt{README.md}.
+    \item Collaborated in an \textbf{Agile environment}, contributing to code reviews, bug fixes, sprint planning, and feedback sessions.
+  \end{itemize}
+
+  \item \textbf{Research Intern, Department of Computer Engineering, VIT Pune} \hfill \textbf{Jun 2024 -- Aug 2024}
+  \begin{itemize}
+    \setlength\itemsep{0pt}
+    \item Co-developed \textbf{“NeoNate Mom”}, a \textbf{medical health platform} supporting over \textbf{1,000+ mothers} of preterm infants with health tracking, alerts, and discussion forums.
+    \item Co-authored a research paper, currently \textbf{under review at the ACM CHI Conference on Human Factors in Computing Systems} (Tier-1 in Human-Computer Interaction).
+  \end{itemize}
+
+  \item \textbf{Software Project Intern, Revogreen Technologies} \hfill \textbf{Sep 2022 -- Jan 2023}
+  \begin{itemize}
+    \setlength\itemsep{0pt}
+    \item Engineered \textbf{Bluetooth-based data communication features and UI} from scratch in the \textbf{Smart Shunt mobile app} built using \textbf{Flutter}.
+    \item Managed the entire product flow from \textbf{Figma-based UI/UX design} to deployment, completing the project within a tight timeline.
+  \end{itemize}
+
+\end{itemize}
+\section{Publications}
+\begin{enumerate}
+
+    \item \textbf{S. Thosar}, R. Bharadwaj, S. Ratnaparkhi, R. Rajpurohit, K. Rahate, and R. Pandita,  
+    “\textit{Deepfake Detection for Preventing Audio and Video Frauds using Advanced Deep Learning Techniques},”  
+    in \textit{Proc. of 2023 International Conference on Integrated Intelligence and Communication Systems (ICIICIS)},  
+    IEEE, Nov. 2023, pp. 1–7.  
+    DOI: \url{https://doi.org/10.1109/ICAICCIT60255.2023.10465762}  
+    \textit{(Indexed in Scopus)}
+
+    \item \textbf{S. Thosar}, K. Ingale, S. Vaze, V. Uttarwar, S. Urane, and T. Mahajan,  
+    “\textit{Battlefield Health Surveillance with Soldier Tracking: A Privacy-Preserving Encrypted Approach},”  
+    in \textit{Proc. of 2023 International Conference on Advances in Computation, Communication and Information Technology (ICAICCIT)},  
+    IEEE, Nov. 2023, pp. 896–903.  
+    DOI: \url{https://doi.org/10.1109/ICIICS59993.2023.10421486}  
+    \textit{(Indexed in Scopus)}
+
+\end{enumerate}
+
+
+\section{Skills Summary}
+\small
+\renewcommand{\arraystretch}{0.8}
+\begin{tabular}{p{4.8cm}p{13.5cm}}
+  \textbf{Programming Languages:} & Python, C++, Java, C, TypeScript, SQL, Dart, R, JavaScript, HTML/CSS, LaTeX \\
+  \textbf{Frameworks:} & React Native, ReactJS, Flutter, Node.js, Express.js, Redux, Spring Boot, Django \\
+  \textbf{Libraries:} & TensorFlow, PyTorch, OpenCV, Scikit-learn, NumPy, Pandas, Matplotlib, NLTK \\
+  \textbf{DevOps \& Deployment:} & Docker, Kubernetes, Jenkins, MLFlow, Git, GitHub, CI/CD Pipelines, Firebase, AWS, GCP \\
+  \textbf{Databases:} & PostgreSQL, MySQL, MongoDB, Realm, Firebase Firestore \\
+  \textbf{Tools \& Platforms:} & Figma, JIRA, Anthropic Claude API, MCP, Claude Code, Claude Cowork, Agent Skills \\
+  \textbf{Core Competencies:} & Problem Solving, Leadership, Team Management, Research Communication, Public Speaking, Collaboration, Time Management, Agile/Scrum, Initiative, Documentation \\
+  \textbf{Areas of Interest:} & Mobile App Development, Cross-platform Development, AI/ML, Research \\
+\end{tabular}
+
+
+% --------OPEN SOURCE CONTRIBUTIONS------
+\section{Selected Technical Projects}
+\small
+\begin{itemize}[itemsep=1pt, topsep=1pt]
+
+\item \textbf{StackIQ: AI/SaaS Utilization Diagnostic Harness for Claude} 
+\hfill \emph{Nov '25 – Present}
+\begin{itemize}
+    \item Built a harness-level diagnostic for \textbf{Claude (Cowork / Claude Code)} auditing AI/SaaS usage: \textbf{idle seats, tier mismatches, duplicate tools, orphaned accounts, and shadow IT}.
+    \item Architected a \textbf{5-stage, read-then-act pipeline} — stages 1–4 read-only, stage 5 executes only pre-approved fixes behind a \textbf{hard human-approval gate}.
+    \item Sized every finding in \textbf{dollars, seats, or accounts}; shipped as an \textbf{Excel workbook} and \textbf{CEO-level deck}.  
+\end{itemize}
+
+\item \textbf{SceneIt: AI-based Prompt-Driven Video Editing Tool} 
+\hfill \emph{Jun '25 – Present}
+\begin{itemize}
+    \item Built an \textbf{AI-powered video editing platform} allowing users to edit videos via natural language prompts.  
+    \item Automated tasks such as \textbf{trimming, transitions, overlays, and effects} through text-to-action parsing.  
+    \item Reduced manual editing time by over \textbf{70\%} and provided creative suggestions using generative AI.  
+\end{itemize}
+
+\item \textbf{React Native Syngenta Plantix Package} 
+\hfill \emph{Jan '25 – July '25}
+\begin{itemize}
+    \item Pioneered a modular \textbf{React Native library} enabling Plantix (AI-powered crop disease identification).  
+    \item Designed dynamic, reusable feature packages supporting cross-app deployment in Syngenta’s global apps, including \textbf{Cropwise Grower (3M+ users)}.  
+    \item \textit{Technologies: React Native, Redux, Realm DB, NPM, JavaScript.}  
+\end{itemize}
+
+\item \textbf{IEEE App — IEEE VIT Pune Student Branch} 
+\hfill \emph{Jan '24 – Apr '24}
+\begin{itemize}
+    \item Worked as part of a 5-member team to design and deploy a \textbf{Flutter app} for event and community engagement.  
+    \item Integrated \textbf{QR-based attendance}, \textbf{Firebase backend}, and \textbf{YouTube API} for resources and quizzes.  
+    \item Deployed successfully on the \textbf{Google Play Console}; streamlined member interaction and event tracking.  
+    \item \textit{Technologies: Flutter, Firebase, Dart, Google Play Console, YouTube API.}  
+\end{itemize}
+\end{itemize}
+
+
+
+    % \item \textbf{Automatic Information Tracker For Students}
+    % \hfill \emph{Dec '23 - Mar '24}\\
+    % \emph{Django REST, React JS, SQL} \\
+    %     Created a website to address the challenges faced by students when searching for suitable PG accommodation, hostel, and tiffin services in Nadiad.Implemented REST APIs and a responsive UI. Tested by 50+ students for usability and feedback.
+
+    %      \item \textbf{Stress Relief Application} 
+    %      \hfill \emph{Dec '23 - Mar '24}\\
+    % \emph{Spring Boot, React JS, PostgreSQL, Docker, Jenkins} \\
+    % Created a website with exercises to help with stress.  
+    % Has the functionality of breathing exercises, gratitude journal writing, diary writing, etc.  
+    % Containerized the application using \emph{Docker} for seamless deployment and scalability.  
+    % Implemented a \emph{CI/CD pipeline} using \emph{Jenkins} to automate builds and deployments.  
+
+    %        \item \textbf{TOC} \\
+    % \emph{(Python, Lex, Yacc, Jan'24- Apr'24)} \\
+    % Developed a Toy Language designed to explore compiler design principles. With components like Lexer and Parser already in place, it's an ongoing endeavor. This language is tailored for those delving into Theory of Computation research or simply seeking to grasp its concepts visually. 
+          
+%   \item \textbf{Review Website (Tipster)} \\
+%     \emph{(One-stop destination for reviews in various categories, Feb '23)}
+%     \begin{itemize}
+%       \item Created a comprehensive review website covering sports, music, books, movies, etc.
+%       \item Designed an intuitive user interface for efficient navigation and access to curated review pages.
+%     \end{itemize}
+% \item \textbf{Onlive CV Builder Database Management System} \\
+%   \emph{(Database Management System project using PostgreSQL, Dec '22 - Mar 23)}
+%   \begin{itemize}
+%     \item Implemented database techniques, including ER model design, for an online CV builder system.
+%     \item Created a PostgreSQL database schema to store CV-related information and populated it using dummy data.
+%     \item Formulated and executed PostgreSQL queries for efficient data retrieval and management.
+%     % Add more details as needed.
+%   \end{itemize}
+%  \section{Selected Technical Projects}
+% \small
+% \begin{itemize}
+%     \item \textbf{DashIndo3D: Monocular 3D Local Mapping from Dashcam Videos} 
+% \hfill \emph{Jul '25 – Present} \\
+% Developing a pipeline to reconstruct sparse 3D local maps from monocular dashcam footage in unstructured urban settings. This approach estimates depth and camera trajectories from videos, followed by geometric fusion for local structure reconstruction. Current efforts focus on scale alignment using vehicle dynamics data and future applications in navigation and localization, specifically addressing challenges in Indian road scenes like occlusion, heterogeneous traffic, and poor lane discipline.
+
+% \item \textbf{Jigsaw Puzzle Solver Utilizing Self-Supervised Learning} \hfill \emph{May '25 – Present} \\
+% \emph{PyTorch, Pascal VOC, Self-Supervised Learning} \\
+% Developing a self-supervised model to solve jigsaw image puzzles. Generated a domain-agnostic dataset from Pascal VOC and trained contrastive embeddings to capture features, with a Streamlit UI currently in progress.
+%   \item \textbf{Car Detection in Low Visibility} 
+%   \hfill \emph{Jul '24 - Oct '24}\\
+%     \emph{Image Processing, OpenCV, YOLOv8, DeepSORT} \\
+%        Built a real-time vehicle detection system for foggy conditions by combining DCP and CLAHE for contrast enhancement with YOLOv8 and DeepSORT for robust tracking; improved visibility by 85\% with 1–2s processing lag.
+
+
+
+
+
+
+%-----------PATENTS-----------------
+
+
+%-----------LEADERSHIP, INVOLVEMENT, AND CERTIFICATIONS-----------------
+\section{Leadership, Involvement, and Certifications}
+\small
+\begin{itemize}[leftmargin=*, itemsep=1pt, topsep=1pt]
+
+  \item \textbf{IEEE Student Branch, VIT Pune} \emph{(2021 -- 2024)}: 
+  Progressed from \textbf{Executive Committee Member} to \textbf{Project Head}. Contributed as part of the App Team, developing and maintaining multiple projects while mentoring peers in app development. Conducted internal coding sessions and organized hands-on workshops to strengthen technical knowledge within the branch.
+
+  \item \textbf{App Team Leadership:} 
+  As Project Head, guided and mentored 35 executive committee members in Flutter, app development, and open-source practices. Structured a workshop-based learning model with weekly tasks, identified top performers, and formed a core app team to build the official IEEE SB mobile application. Supervised two additional industry projects under the team’s portfolio.
+
+  \item \textbf{DevOps Workshop Instructor:} 
+  Served as a technical instructor for a large-scale DevOps workshop, delivering hands-on sessions to over 60 participants covering Docker, CI/CD, Kubernetes, and cloud deployment fundamentals.
+
+  \item \textbf{Hacktoberfest Contributor \& Mentor} \emph{(2022 -- 2023)}: 
+  Achieved \textbf{Level 4 Contributor} for two consecutive years by making consistent open-source contributions. Later introduced and mentored IEEE members in contributing to open source, helping many achieve their first successful PRs.
+
+  \item \textbf{Student Council, VIT Pune} \emph{(2023 -- 2024)}: 
+  Served as \textbf{Finance Coordinator}, managing event budgets, vendor coordination, and financial documentation for major campus events. Collaborated closely with faculty and management to ensure smooth execution of college-wide initiatives.
+
+  \item \textbf{Certifications:} 
+  Earned the \textbf{IBM Full Stack Software Development Specialization (Coursera)} — a comprehensive 15-course program covering front-end, back-end, DevOps, and cloud deployment workflows. Additional certifications in Machine Learning, Deep Learning, and Data Analysis using Python.
+
+  \item \textbf{Anthropic Certifications:} 
+  Completed 5 Anthropic certifications — \textbf{Introduction to Model Context Protocol}, \textbf{Claude with the Anthropic API}, \textbf{Introduction to Agent Skills}, \textbf{Claude Code in Action}, and \textbf{AI Fluency: Framework \& Foundations}.
+
+\end{itemize}
+
+\section{Education}
+\begin{tabularx}{\linewidth}{@{}l X r@{}}	
+2021 -- 2025 & \textbf{B.Tech in Computer Engineering}, Vishwakarma Institute of Technology (VIT), Pune & \textit{CGPA: 8.64/10.0} \\
+& \textbf{Relevant Coursework:} Data Structures and Algorithms, Operating Systems, Database Management Systems, Artificial Intelligence, Machine Learning, Computer Networks & \\
+\\
+2020 -- 2021 & \textbf{Higher Secondary Education (HSC)}, Deogiri College, Aurangabad & \textit{Percentage: 93.33\%} \\
+2018 -- 2019 & \textbf{Class 10\textsuperscript{th}}, Stepping Stones High School, Aurangabad (CBSE) & \textit{Percentage: 87.60\%} \\
+\end{tabularx}
+
+% \section{Parental Details}
+% \small
+% \begin{itemize}[leftmargin=*]
+%   \item \textbf{Father’s Name:} Vivek Balaji Kulkarni
+%   \item \textbf{Contact Number (Father):} +91-8347001218
+%   \item \textbf{Email Address (Father):} viveksnehal98@gmail.com
+%   \item \textbf{Permanent Address:} E-704, Silver Oak, Near Harni Water Tank, Harni, Vadodara, Gujarat, India-390022
+% \end{itemize}
+
+  
+
+
+%-----------CLUBS AND VOLUNTEERING-----------------
+% \section{Clubs and Volunteering}
+% \small
+% \begin{itemize}
+%   % \item \textbf{DDU Connect:} Junior Web Developer, Nadiad, India, May 2022 - July 2023
+%   \item \textbf{The Reader's Community (TRC):} Content Writing Head, Apr '22 - Dec '24
+%   \item \textbf{Institute of Electronics and Telecommunication Engineers (IETE):} Member, August '23- Present
+%   \item \textbf{National Service Scheme (NSS):} Volunteer, August '23 - Present
+% \end{itemize}
+
+%-----------LANGUAGES KNOWN-----------------
+% \section{Languages Known}
+% English, Hindi, Marathi, Gujarati
+
+\end{document}
