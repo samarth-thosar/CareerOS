@@ -1,0 +1,25 @@
+# Everything runs locally -- no cloud services, no paid tiers. See
+# docs/architecture/decisions/0005-zero-paid-services-constraint.md.
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      CAREEROS_DATABASE_URL: sqlite+aiosqlite:////data/careeros.db
+      CAREEROS_LLM__BASE_URL: http://ollama:11434
+    volumes:
+      - careeros_data:/data
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+volumes:
+  careeros_data:
+  ollama_data:

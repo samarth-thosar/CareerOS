@@ -1,0 +1,31 @@
+# Domain tunables -- edit freely without redeploying. Secrets go in .env instead (see .env.example).
+# Loaded by careeros.infrastructure.config.settings.Settings, with env vars taking precedence over this file.
+
+environment: development
+log_level: INFO
+
+scoring_weights:
+  resume_match: 0.30
+  skill_area_fit: 0.25
+  career_progression_fit: 0.15
+  remote_fit: 0.10
+  salary_fit: 0.10
+  company_quality: 0.10
+
+llm:
+  provider: ollama
+  model: qwen3:8b
+  base_url: http://localhost:11434
+
+feature_flags:
+  auto_apply_enabled: false
+  auto_tailor_resume: true
+  notification_batching_window_minutes: 60
+
+enabled_providers:
+  wellfound: true
+  greenhouse: false
+  lever: false
+  ashby: false
+  generic: false
+  linkedin: false
