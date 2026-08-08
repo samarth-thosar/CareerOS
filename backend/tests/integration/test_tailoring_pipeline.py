@@ -28,6 +28,7 @@ from careeros.infrastructure.persistence.models import Base
 from careeros.infrastructure.resume.artifact_store import ArtifactStore
 from tests.fakes.fake_job_source_provider import FakeJobSourceProvider
 from tests.fakes.fake_llm_provider import FakeLLMProvider
+from tests.fakes.fake_resume_renderer import FakeResumeRenderer
 
 # Deliberately a fixture bank and profile rather than the shipped data/master + config/profile.yaml. Those are
 # the user's own content and change freely; coupling assertions to them would make editing a resume break the
@@ -124,6 +125,9 @@ async def container(tmp_path, monkeypatch) -> Container:
     built.artifact_store = ArtifactStore(root=tmp_path / "applications")
     built.llm_provider = _tailoring_response()
     built.achievement_bank = TEST_BANK
+    # A fake renderer, so the suite neither shells out to a LaTeX engine nor behaves differently depending on
+    # whether one is installed. Real rendering is covered in test_latex_renderer.py.
+    built.resume_renderer = FakeResumeRenderer()
     await in_session(built, lambda s: s.candidate_profile.replace(TEST_PROFILE))
     try:
         yield built
@@ -195,21 +199,63 @@ class TestSuccessfulTailoring:
 
         assert [gap.missing_skill_or_requirement for gap in gaps] == ["Kubernetes experience"]
 
-    async def test_pdf_is_skipped_cleanly_without_a_latex_toolchain(self, container: Container) -> None:
+class TestPdfRendering:
+    """All three renderer outcomes, with the invariant that a .tex always survives."""
+
+    async def test_successful_render_marks_the_version_rendered(self, container: Container) -> None:
+        job_id = await _discover(container)
+
+        outcome = await in_session(container, lambda s: s.resume_manager.tailor_for_job(job_id))
+        versions = await in_session(container, lambda s: s.resume_manager.versions_for_job(job_id))
+
+        assert outcome.pdf_rendered is True
+        assert versions[0].render_status is RenderStatus.RENDERED
+        assert versions[0].pdf_path is not None
+        assert (outcome.artifact_directory / "resume.pdf").exists()
+
+    async def test_absent_toolchain_still_produces_the_tex(self, container: Container) -> None:
+        container.resume_renderer = FakeResumeRenderer(available=False)
+        job_id = await _discover(container)
+
+        outcome = await in_session(container, lambda s: s.resume_manager.tailor_for_job(job_id))
+        versions = await in_session(container, lambda s: s.resume_manager.versions_for_job(job_id))
+
+        assert (outcome.pdf_rendered, outcome.pdf_unavailable) == (False, True)
+        assert versions[0].render_status is RenderStatus.DRAFT
+        assert versions[0].pdf_path is None
+        assert (outcome.artifact_directory / "resume.tex").exists()
+
+    async def test_failed_compile_is_distinguished_from_an_absent_toolchain(
+        self, container: Container
+    ) -> None:
+        # The distinction matters: one is fixed by installing software, the other by fixing the document.
+        container.resume_renderer = FakeResumeRenderer(succeeds=False)
         job_id = await _discover(container)
 
         outcome = await in_session(container, lambda s: s.resume_manager.tailor_for_job(job_id))
 
-        # Whether a toolchain exists is environmental; either way the .tex must exist and the state must be
-        # consistent -- never "rendered" without a PDF.
-        versions = await in_session(container, lambda s: s.resume_manager.versions_for_job(job_id))
-        if outcome.pdf_rendered:
-            assert versions[0].render_status is RenderStatus.RENDERED
-            assert versions[0].pdf_path is not None
-        else:
-            assert versions[0].render_status is RenderStatus.DRAFT
-            assert versions[0].pdf_path is None
+        assert (outcome.pdf_rendered, outcome.pdf_unavailable) == (False, False)
         assert (outcome.artifact_directory / "resume.tex").exists()
+        assert not (outcome.artifact_directory / "resume.pdf").exists()
+
+    async def test_a_resume_version_is_never_rendered_without_a_pdf_path(
+        self, container: Container
+    ) -> None:
+        # Discover once: re-running discovery is a no-op by design, so tailor the same job repeatedly instead.
+        job_id = await _discover(container)
+        for renderer in (
+            FakeResumeRenderer(),
+            FakeResumeRenderer(available=False),
+            FakeResumeRenderer(succeeds=False),
+        ):
+            container.resume_renderer = renderer
+            await in_session(container, lambda s: s.resume_manager.tailor_for_job(job_id))
+
+        versions = await in_session(container, lambda s: s.resume_manager.versions_for_job(job_id))
+        assert len(versions) == 3
+        for version in versions:
+            rendered = version.render_status is RenderStatus.RENDERED
+            assert rendered == (version.pdf_path is not None), "render status and pdf_path must agree"
 
 
 class TestNormalisesModelSloppiness:

@@ -41,8 +41,24 @@ uvicorn careeros.presentation.api.app:create_app --factory --reload
 `GET http://localhost:8000/health` should return `{"status": "ok"}` once the server is running -- this does
 a real round trip through the database, not a hardcoded response.
 
-Ollama (for the LLM subsystem) is not required to boot the app or pass tests in this phase, since no
-scoring/tailoring logic exists yet. It becomes required starting at Phase 6.
+Ollama is required for scoring and resume tailoring. Pull the default model once with `ollama pull qwen3:8b`;
+the app boots and the test suite passes without it, since tests use a scripted model rather than a real one.
+
+### PDF rendering (optional)
+
+Tailoring always writes `resume.tex`. Compiling it to PDF needs a LaTeX engine — any of `tectonic`,
+`pdflatex`, `xelatex` or `lualatex` on `PATH` is detected automatically. Tectonic is the lightest option: a
+single ~50MB binary that downloads only the packages a document actually uses.
+
+```bash
+# Windows: grab the release binary and put it somewhere on PATH
+curl -L -o tectonic.zip https://github.com/tectonic-typesetting/tectonic/releases/latest/download/tectonic-0.17.0-x86_64-pc-windows-msvc.zip
+# macOS/Linux: brew install tectonic  |  cargo install tectonic
+```
+
+With no engine installed nothing breaks — tailoring reports `pdf_unavailable` and still produces the `.tex`.
+If an engine is installed but a long-running shell or IDE has not picked up the `PATH` change, set
+`CAREEROS_RESUME__LATEX_ENGINE` in `.env` to its absolute path.
 
 ### Frontend
 
