@@ -47,6 +47,14 @@ class JobSummary:
 
 
 @dataclass(slots=True)
+class JobDetail:
+    """A single job, including the full posting text the summary view omits."""
+
+    summary: JobSummary
+    description: str
+
+
+@dataclass(slots=True)
 class ApplicationTimelineEntry:
     from_status: str | None
     to_status: str

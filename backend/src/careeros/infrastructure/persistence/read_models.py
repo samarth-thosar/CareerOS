@@ -7,12 +7,14 @@ light CQRS split described in docs/architecture/03-event-catalog-and-pipeline.md
 """
 from __future__ import annotations
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, String, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from careeros.application.dto.filters import JobFilters
 from careeros.application.dto.job_dto import (
     ApplicationSummary,
     ApplicationTimelineEntry,
+    JobDetail,
     JobSummary,
     ScoreDetail,
 )
@@ -60,10 +62,8 @@ class JobReadModel:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def list_jobs(
-        self, *, limit: int = 50, offset: int = 0, order_by_score: bool = False, min_score: int | None = None
-    ) -> list[JobSummary]:
-        """Discovered jobs. `order_by_score` gives the ranked shortlist; default is newest-first."""
+    def _base_query(self, filters: JobFilters) -> Select:
+        """Job rows joined to company, tracked status and latest score, with `filters` applied."""
         latest = _latest_score_subquery()
         stmt = (
             select(JobModel, CompanyModel.name, ApplicationModel.status, ScoreModel)
@@ -75,8 +75,40 @@ class JobReadModel:
                 (ScoreModel.job_id == latest.c.job_id) & (ScoreModel.created_at == latest.c.latest_at),
             )
         )
-        if min_score is not None:
-            stmt = stmt.where(ScoreModel.value >= min_score)
+
+        if filters.search:
+            term = f"%{filters.search.lower()}%"
+            stmt = stmt.where(
+                func.lower(JobModel.title).like(term) | func.lower(CompanyModel.name).like(term)
+            )
+        if filters.company:
+            stmt = stmt.where(func.lower(CompanyModel.name) == filters.company.lower())
+        if filters.source:
+            stmt = stmt.where(JobModel.source == filters.source)
+        if filters.remote_type:
+            stmt = stmt.where(JobModel.remote_type == filters.remote_type)
+        if filters.technology:
+            # skills is a JSON array; a LIKE on the serialised text is enough at single-user scale and avoids
+            # depending on SQLite's JSON extension being present.
+            stmt = stmt.where(func.lower(func.cast(JobModel.skills, String)).like(f"%{filters.technology.lower()}%"))
+        if filters.status:
+            stmt = stmt.where(ApplicationModel.status == filters.status)
+        if filters.min_score is not None:
+            stmt = stmt.where(ScoreModel.value >= filters.min_score)
+        if filters.unscored_only:
+            stmt = stmt.where(ScoreModel.id.is_(None))
+        return stmt
+
+    async def list_jobs(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        order_by_score: bool = False,
+        filters: JobFilters | None = None,
+    ) -> list[JobSummary]:
+        """Discovered jobs. `order_by_score` gives the ranked shortlist; default is newest-first."""
+        stmt = self._base_query(filters or JobFilters())
         # nulls_last so unscored jobs sink below the ranked ones rather than heading the shortlist.
         stmt = stmt.order_by(
             ScoreModel.value.desc().nulls_last() if order_by_score else JobModel.discovered_at.desc()
@@ -105,12 +137,48 @@ class JobReadModel:
             for job, company_name, status, score in rows
         ]
 
-    async def count_jobs(self) -> int:
-        return (await self._session.execute(select(func.count()).select_from(JobModel))).scalar_one()
+    async def count_jobs(self, filters: JobFilters | None = None) -> int:
+        """How many jobs match, so the UI can page and show "N of M" honestly."""
+        active = filters or JobFilters()
+        if active.is_empty:
+            return (await self._session.execute(select(func.count()).select_from(JobModel))).scalar_one()
+        counting = self._base_query(active).with_only_columns(func.count(JobModel.id))
+        return (await self._session.execute(counting)).scalar_one()
 
     async def count_scored(self) -> int:
         stmt = select(func.count(func.distinct(ScoreModel.job_id)))
         return (await self._session.execute(stmt)).scalar_one()
+
+    async def get_job(self, job_id: str) -> JobDetail | None:
+        """One job with its full description and score reasoning."""
+        stmt = self._base_query(JobFilters()).where(JobModel.id == job_id)
+        row = (await self._session.execute(stmt)).first()
+        if row is None:
+            return None
+
+        job, company_name, status, score = row
+        return JobDetail(
+            summary=JobSummary(
+                id=job.id,
+                source=job.source,
+                title=job.title,
+                company_name=company_name,
+                url=job.url,
+                location=_format_location(job.location_city, job.location_country),
+                remote_type=job.remote_type,
+                salary_min=job.salary_min,
+                salary_max=job.salary_max,
+                salary_currency=job.salary_currency,
+                salary_is_estimated=job.salary_is_estimated,
+                skills=list(job.skills),
+                posting_date=job.posting_date,
+                discovered_at=job.discovered_at,
+                status=status,
+                score=score.value if score else None,
+                score_detail=_score_detail(score),
+            ),
+            description=job.description,
+        )
 
 
 class ApplicationReadModel:

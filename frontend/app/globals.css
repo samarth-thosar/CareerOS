@@ -1,1 +1,145 @@
 @import "tailwindcss";
+
+/*
+  CareerOS dashboard tokens.
+
+  Design brief: this is a decision surface, not an analytics dashboard. Its single job is turning a few hundred
+  scraped postings into a ranked, explained shortlist. So the hero is the top match and its reasoning, not a row
+  of KPI tiles, and the element the page is remembered by is the six-dimension score strip on every row -- the
+  product's actual differentiator is that scores come with reasons, so the reasons are visible without clicking.
+
+  Colour follows the data-viz rules rather than taste:
+  - A score is a MAGNITUDE, so it gets one sequential hue (blue, light->dark). Length encodes value; labels
+    distinguish the six dimensions. No categorical palette is needed anywhere, which is why there isn't one.
+  - Application state is a STATE, so it uses the reserved status palette, always with a text label beside it --
+    never colour alone.
+  Both score ramps below were produced by running the palette validator in --ordinal mode against these exact
+  surfaces, not chosen by eye. Light runs light->dark as value rises; dark runs dark->light, independently
+  stepped rather than an inverted copy of the light ramp.
+
+  Type is the system sans throughout, with tabular figures for every number so score columns align. No display
+  face: this is an instrument readout, and a characterful serif would fight the density.
+*/
+
+@theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "Consolas", monospace;
+}
+
+:root {
+  color-scheme: light;
+
+  --plane: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-raised: #ffffff;
+
+  --ink: #0b0b0b;
+  --ink-secondary: #52514e;
+  --ink-muted: #898781;
+
+  --hairline: #e1e0d9;
+  --baseline: #c3c2b7;
+  --ring: rgba(11, 11, 11, 0.1);
+
+  /*
+    Sequential blue, five ordinal steps for the score bars. These exact values passed
+    scripts/validate_palette.js --ordinal against this surface: monotone lightness, every adjacent gap
+    >= 0.06 L, and the lightest step clearing 2:1 against the surface. An earlier attempt used ramp steps
+    400 and 450 side by side and FAILED -- their lightness differs by 0.047, so adjacent bars were not
+    distinguishable. Re-step with the validator rather than by eye if these change.
+  */
+  --score-1: #86b6ef; /* lowest band  */
+  --score-2: #5598e7;
+  --score-3: #2a78d6;
+  --score-4: #1c5cab;
+  --score-5: #0d366b; /* highest band */
+
+  /* Interactive/accent blue: links and primary buttons, not part of the score encoding. */
+  --accent: #1c5cab;
+
+  /* Reserved status palette -- never reused as a series colour. */
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --plane: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-raised: #222221;
+
+    --ink: #ffffff;
+    --ink-secondary: #c3c2b7;
+    --ink-muted: #898781;
+
+    --hairline: #2c2c2a;
+    --baseline: #383835;
+    --ring: rgba(255, 255, 255, 0.1);
+
+    /* Re-stepped for the dark surface, not an inverted light ramp. */
+    --score-1: #184f95; /* lowest band  */
+    --score-2: #256abf;
+    --score-3: #3987e5;
+    --score-4: #6da7ec;
+    --score-5: #9ec5f4; /* highest band */
+  
+    --accent: #5598e7;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --plane: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-raised: #222221;
+
+  --ink: #ffffff;
+  --ink-secondary: #c3c2b7;
+  --ink-muted: #898781;
+
+  --hairline: #2c2c2a;
+  --baseline: #383835;
+  --ring: rgba(255, 255, 255, 0.1);
+
+  --score-1: #184f95; /* lowest band  */
+  --score-2: #256abf;
+  --score-3: #3987e5;
+  --score-4: #6da7ec;
+  --score-5: #9ec5f4; /* highest band */
+
+  --accent: #5598e7;
+}
+
+body {
+  background: var(--plane);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Every figure in the UI is tabular, so score columns line up without a monospace face. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Keyboard focus must stay visible; the density here makes a lost focus ring genuinely disorienting. */
+:where(a, button, input, select, summary):focus-visible {
+  outline: 2px solid var(--score-3);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

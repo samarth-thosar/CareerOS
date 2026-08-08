@@ -23,6 +23,7 @@ from careeros.infrastructure.bootstrap import (
     seed_candidate_profile,
 )
 from careeros.infrastructure.logging import configure_logging
+from careeros.presentation.api.routes.analytics import router as analytics_router
 from careeros.presentation.api.routes.applications import router as applications_router
 from careeros.presentation.api.routes.health import router as health_router
 from careeros.presentation.api.routes.jobs import router as jobs_router
@@ -85,4 +86,5 @@ def create_app() -> FastAPI:
     app.include_router(applications_router)
     app.include_router(scoring_router)
     app.include_router(resumes_router)
+    app.include_router(analytics_router)
     return app

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 
+from careeros.application.dto.filters import JobFilters
 from careeros.application.ports.job_source_provider import RawJobPosting, SearchCriteria
 from careeros.application.ports.llm_provider import LLMResponse
 from careeros.domain.application.application import ApplicationStatus
@@ -148,6 +149,8 @@ class TestScoringBacklog:
         await in_session(container, lambda s: s.scoring.score_pending(10))
 
         async with container.session_factory() as session:
-            shortlist = await JobReadModel(session).list_jobs(order_by_score=True, min_score=70)
+            shortlist = await JobReadModel(session).list_jobs(
+                order_by_score=True, filters=JobFilters(min_score=70)
+            )
 
         assert shortlist == []
