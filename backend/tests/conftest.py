@@ -1,0 +1,14 @@
+"""Pytest configuration.
+
+pytest imports conftest before any test module, which makes it the right place to apply the WMI workaround:
+it has to run before anything imports SQLAlchemy. See scripts/wmi_workaround.py for why that matters and how
+to remove it once the Windows WMI service is healthy again.
+"""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import scripts.wmi_workaround  # noqa: E402,F401  (importing it applies it)
