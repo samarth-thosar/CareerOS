@@ -24,9 +24,26 @@ class RemoteType(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class Location:
+    """Where a job is.
+
+    `raw` is the posting's own location text, kept verbatim and treated as the source of truth. `city` and
+    `country` are a convenience for display and are only populated when the text names a single unambiguous
+    place -- postings routinely list several ("New York, San Francisco, Seattle, or Remote (US/Canada)"), and
+    forcing those into one city/country pair produced nonsense. Anything deciding eligibility must read `raw`.
+    """
+
     city: str | None
     country: str | None
     remote_type: RemoteType
+    raw: str | None = None
+
+    @property
+    def display(self) -> str:
+        """What to show a human: the posting's own words, falling back to the parsed pair."""
+        if self.raw:
+            return self.raw
+        parts = [part for part in (self.city, self.country) if part]
+        return ", ".join(parts) if parts else "unspecified"
 
 
 @dataclass(frozen=True, slots=True)

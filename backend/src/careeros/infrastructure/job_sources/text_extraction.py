@@ -28,6 +28,9 @@ _CURRENCY_CODES = {"$": "USD", "€": "EUR", "£": "GBP", "₹": "INR"}
 # Separators ATS location strings use. Greenhouse in particular writes "San Francisco, CA • United States".
 _LOCATION_SEPARATOR = re.compile(r"[,/|•·;]|\s[-–]\s")
 
+# Words that join a list of places rather than naming one ("New York, San Francisco, or Remote").
+_MULTI_LOCATION_JOINER = re.compile(r"(?:or|and|either|n\s*/?\s*a)", re.IGNORECASE)
+
 # Skills whose names are also ordinary English words. Plain word-boundary matching produces false positives
 # ("go to market" tagging a Program Manager role as a Go developer), so these require a qualifier that only
 # appears in a technical context. Precision matters more than recall here: a phantom skill misleads scoring,
@@ -73,9 +76,16 @@ def html_to_text(raw_html: str) -> str:
 
 
 def parse_location(raw_location: str | None) -> Location:
-    """Interpret a free-text ATS location string (e.g. "Remote - US", "Bengaluru, India")."""
+    """Interpret a free-text ATS location string (e.g. "Remote - US", "Bengaluru, India").
+
+    The raw text is always preserved and is what eligibility is decided from. `city`/`country` are filled in
+    only when the text names a *single* place: postings frequently list several, and an earlier version of this
+    function forced them into one pair, turning "New York, San Francisco, Seattle, or Remote (US/Canada)" into
+    city="San Francisco", country="WA" and "N/A" into city="N", country="A". A wrong city is worse than none,
+    because it reads as fact.
+    """
     if not raw_location or not raw_location.strip():
-        return Location(city=None, country=None, remote_type=RemoteType.UNKNOWN)
+        return Location(city=None, country=None, remote_type=RemoteType.UNKNOWN, raw=None)
 
     text = raw_location.strip()
     lowered = text.lower()
@@ -86,12 +96,15 @@ def parse_location(raw_location: str | None) -> Location:
     else:
         remote_type = RemoteType.ONSITE
 
-    # Drop the remote/hybrid qualifier so only place names remain, then read "City, Region, Country".
+    # Drop the remote/hybrid qualifier so only place names remain, then read "City, Country".
     place = re.sub(r"\b(fully\s+)?(remote|hybrid|onsite|on-site|anywhere)\b", "", text, flags=re.IGNORECASE)
-    parts = [part.strip() for part in _LOCATION_SEPARATOR.split(place) if part.strip()]
-    city = parts[0] if parts else None
-    country = parts[-1] if len(parts) > 1 else None
-    return Location(city=city, country=country, remote_type=remote_type)
+    parts = [part.strip(" -–—/|") for part in _LOCATION_SEPARATOR.split(place)]
+    parts = [part for part in parts if len(part) > 1 and not _MULTI_LOCATION_JOINER.fullmatch(part)]
+
+    # "City, Country" is one place; three or more fragments means a list, and guessing is worse than abstaining.
+    city = parts[0] if len(parts) in (1, 2) else None
+    country = parts[1] if len(parts) == 2 else None
+    return Location(city=city, country=country, remote_type=remote_type, raw=text)
 
 
 def _to_amount(token: str) -> float:

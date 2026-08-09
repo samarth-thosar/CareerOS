@@ -6,6 +6,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from careeros.application.services.cover_letter_service import CoverLetterResponseError
 from careeros.application.services.resume_manager_service import TailoringResponseError
 from careeros.domain.resume.achievement import UnknownAchievementError, UnknownBulletError
 from careeros.domain.resume.tailoring import FabricationError
@@ -111,3 +112,24 @@ async def list_versions(
             for version in versions
         ],
     }
+
+
+@router.post("/cover-letter/{job_id}")
+async def write_cover_letter(
+    job_id: str,
+    container: Annotated[Container, Depends(get_container)],
+) -> dict[str, Any]:
+    """Write a cover letter for one job from the achievement bank and your voice notes.
+
+    422 means the draft was refused for claiming something the bank cannot support -- that message names what,
+    which is the useful part.
+    """
+    if container.achievement_bank is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "No achievement bank loaded")
+    try:
+        outcome = await in_session(container, lambda s: s.cover_letter.generate_for_job(job_id))
+    except FabricationError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"Refused to fabricate: {error}") from error
+    except (CoverLetterResponseError, LookupError, RuntimeError) as error:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from error
+    return asdict(outcome)

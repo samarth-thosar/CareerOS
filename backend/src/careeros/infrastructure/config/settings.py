@@ -97,6 +97,10 @@ class DiscoverySettings(BaseModel):
     title_keywords: list[str] = []
     keywords: list[str] = []
     remote_only: bool = False
+    # Places the candidate is authorised to work. A posting naming only regions outside this list is dropped at
+    # the source: it is a legal constraint, not a preference, so it filters rather than lowering a score.
+    # Empty disables the check entirely.
+    eligible_locations: list[str] = []
     interval_seconds: int = 21_600  # 6 hours; ATS boards do not change minute to minute.
     run_on_startup: bool = False
 

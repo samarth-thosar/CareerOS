@@ -163,3 +163,22 @@ export function BarList({ items, emptyLabel }: { items: { label: string; value: 
     </ol>
   );
 }
+
+/**
+ * Which board a job came from.
+ *
+ * Always shown, never abbreviated away: knowing a posting came from Greenhouse vs Wellfound vs a company page
+ * changes how you read it (freshness, whether the apply flow is automatable, how much to trust the salary), so
+ * it belongs on the row rather than behind a click.
+ */
+export function SourceBadge({ source }: { source: string }) {
+  return (
+    <span
+      className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em]"
+      style={{ color: "var(--ink-secondary)", boxShadow: "inset 0 0 0 1px var(--ring)" }}
+      title={`Found on ${source}`}
+    >
+      {source}
+    </span>
+  );
+}

@@ -6,8 +6,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from careeros.infrastructure.bootstrap import Container, in_session, seed_candidate_profile
-from careeros.infrastructure.config.profile_loader import ProfileConfigError
+from careeros.infrastructure.bootstrap import Container, in_session
 from careeros.presentation.api.dependencies import get_container
 
 router = APIRouter(tags=["scoring"])
@@ -30,29 +29,3 @@ async def run_scoring(
         # Most likely cause is a missing profile or an unreachable Ollama; both are actionable by the caller.
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from error
     return asdict(result)
-
-
-@router.get("/profile")
-async def get_profile(container: Annotated[Container, Depends(get_container)]) -> dict[str, Any]:
-    """The stored candidate profile that scoring reads."""
-    profile = await in_session(container, lambda services: services.candidate_profile.get())
-    if profile is None:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND,
-            "No candidate profile seeded yet; POST /profile/reload to load config/profile.yaml",
-        )
-    return asdict(profile)
-
-
-@router.post("/profile/reload")
-async def reload_profile(container: Annotated[Container, Depends(get_container)]) -> dict[str, Any]:
-    """Re-read config/profile.yaml and replace the stored profile.
-
-    Explicit rather than automatic on boot, so a profile the Memory module has adjusted is never silently
-    reverted by a stale file.
-    """
-    try:
-        profile = await seed_candidate_profile(container)
-    except ProfileConfigError as error:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from error
-    return asdict(profile)

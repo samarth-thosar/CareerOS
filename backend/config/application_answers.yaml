@@ -1,0 +1,54 @@
+# ANSWERS FOR JOB APPLICATION FORMS
+#
+# Every field marked TODO needs you. Edit them here, or in the dashboard at /profile — same file, and the
+# dashboard shows you exactly which ones are still outstanding.
+#
+# CareerOS never guesses these. It will refuse to submit an application while a required field still says TODO,
+# because sending an invented notice period or salary expectation to a real employer is worse than not applying.
+
+# ---------- identity ----------
+full_name: Samarth Shekhar Thosar
+email: samarth.thosar194@gmail.com
+phone: "+91 7887911070"
+current_location: Pune, India
+linkedin_url: https://linkedin.com/in/samarth-thosar
+github_url: https://github.com/samarth-thosar
+portfolio_url: ""            # optional
+
+# ---------- work authorisation ----------
+# Region -> one of: citizen_or_permanent | needs_sponsorship | not_authorised
+# This drives job discovery. Only regions marked citizen_or_permanent are searched, which is why US postings
+# are filtered out rather than scored — you told me you have no US work permit.
+work_authorisation:
+  india: citizen_or_permanent
+  united_states: not_authorised
+  united_kingdom: needs_sponsorship
+  european_union: needs_sponsorship
+requires_visa_sponsorship: true    # true outside India
+
+# ---------- availability ----------
+notice_period_days: TODO           # e.g. 30, 60, 90 — or 0 if you can start immediately
+earliest_start_date: TODO          # e.g. 2026-09-01, or "immediately"
+willing_to_relocate: TODO          # true or false — Pune/Bangalore/Mumbai are your stated preference
+preferred_work_arrangement: remote # remote | hybrid | onsite | any
+
+# ---------- compensation (annual) ----------
+salary_currency: INR
+current_ctc: ""                    # optional; leave blank to omit rather than disclose
+expected_ctc: TODO                 # e.g. "18-24 LPA". Forms almost always require this.
+
+# ---------- background ----------
+total_experience_years: 2          # confirm — this materially moves every job score
+highest_qualification: B.Tech in Computer Engineering, VIT Pune (CGPA 8.64/10)
+
+# Optional demographic questions. Blank means "prefer not to say", which is a valid answer on every form.
+gender: ""
+ethnicity: ""
+disability_status: ""
+veteran_status: ""
+
+# ---------- free text ----------
+# Used as raw material for the "why this company" paragraph. Written per-application from this plus the job
+# description; kept here so the angle is yours rather than the model's invention.
+why_this_company_template: TODO    # e.g. "I want to work on AI systems that ship to real users at scale."
+additional_information: ""

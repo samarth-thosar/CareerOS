@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import type { JobSummary } from "@/lib/api";
 import { ScoreBadge, ScoreStrip } from "@/components/ScoreStrip";
-import { StatusPill } from "@/components/ui";
+import { SourceBadge, StatusPill } from "@/components/ui";
 
 function salaryLabel(job: JobSummary): string | null {
   if (job.salary_min === null || job.salary_max === null) return null;
@@ -15,14 +15,33 @@ function salaryLabel(job: JobSummary): string | null {
   return `${approximate}${currency} ${format(job.salary_min)}-${format(job.salary_max)}`.trim();
 }
 
-export function JobRow({ job }: { job: JobSummary }) {
+export function JobRow({
+  job,
+  selectable = false,
+  selected = false,
+  onToggle,
+}: {
+  job: JobSummary;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggle?: (jobId: string) => void;
+}) {
   const salary = salaryLabel(job);
 
   return (
-    <li style={{ borderTop: "1px solid var(--hairline)" }}>
+    <li className="flex items-start gap-2" style={{ borderTop: "1px solid var(--hairline)" }}>
+      {selectable && (
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggle?.(job.id)}
+          aria-label={`Select ${job.title} at ${job.company_name} to apply`}
+          className="mt-4 shrink-0"
+        />
+      )}
       <Link
         href={`/jobs/${job.id}`}
-        className="grid grid-cols-[3rem_1fr] items-start gap-4 px-1 py-3 transition-colors md:grid-cols-[3rem_minmax(0,1fr)_14rem]"
+        className="grid flex-1 grid-cols-[3rem_1fr] items-start gap-4 px-1 py-3 transition-colors md:grid-cols-[3rem_minmax(0,1fr)_14rem]"
         style={{ color: "var(--ink)" }}
       >
         <div className="pt-0.5 text-right">
@@ -30,7 +49,10 @@ export function JobRow({ job }: { job: JobSummary }) {
         </div>
 
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{job.title}</p>
+          <div className="flex items-baseline gap-2">
+            <p className="truncate text-sm font-medium">{job.title}</p>
+            <SourceBadge source={job.source} />
+          </div>
           <p className="mt-0.5 truncate text-xs" style={{ color: "var(--ink-secondary)" }}>
             {job.company_name}
             {job.location ? ` · ${job.location}` : ""}

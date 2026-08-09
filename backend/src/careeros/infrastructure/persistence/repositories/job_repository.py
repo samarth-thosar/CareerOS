@@ -21,6 +21,7 @@ def _to_domain(model: JobModel) -> Job:
             city=model.location_city,
             country=model.location_country,
             remote_type=RemoteType(model.remote_type),
+            raw=model.location_raw,
         ),
         salary_range=SalaryRange(
             minimum=model.salary_min,
@@ -45,6 +46,7 @@ def _to_model(job: Job) -> JobModel:
         title=job.title,
         url=job.url,
         description=job.description,
+        location_raw=job.location.raw,
         location_city=job.location.city,
         location_country=job.location.country,
         remote_type=job.location.remote_type.value,

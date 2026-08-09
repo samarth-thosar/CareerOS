@@ -256,3 +256,96 @@ export const api = {
     request<{ count: number; items: ResumeVersion[] }>(`/resumes/versions/${jobId}`),
   gaps: () => request<{ count: number; items: GapFlag[] }>("/resumes/gaps"),
 };
+
+// ---------------------------------------------------------------------------
+// Profile, answers, cover letters and applying
+// ---------------------------------------------------------------------------
+
+/** Sentinel the backend writes for "CareerOS is waiting on you". Treated as unanswered, never as a value. */
+export const PLACEHOLDER = "TODO";
+
+export interface ApplicationAnswers {
+  full_name: string;
+  email: string;
+  phone: string;
+  current_location: string;
+  linkedin_url: string;
+  github_url: string;
+  portfolio_url: string;
+  work_authorisation: Record<string, string>;
+  requires_visa_sponsorship: boolean;
+  notice_period_days: number | null;
+  earliest_start_date: string;
+  willing_to_relocate: boolean | null;
+  preferred_work_arrangement: string;
+  current_ctc: string;
+  expected_ctc: string;
+  salary_currency: string;
+  total_experience_years: number | null;
+  highest_qualification: string;
+  gender: string;
+  ethnicity: string;
+  disability_status: string;
+  veteran_status: string;
+  why_this_company_template: string;
+  additional_information: string;
+}
+
+export interface ProfileResponse {
+  profile: Record<string, unknown> | null;
+  answers: ApplicationAnswers;
+  missing: string[];
+  ready_to_apply: boolean;
+  voice: string;
+  achievement_count: number;
+}
+
+export interface SubmissionItem {
+  job_id: string;
+  submitted: boolean;
+  needs_manual_step: boolean;
+  manual_url: string | null;
+  reason: string | null;
+}
+
+export interface SubmitResponse {
+  counts: { submitted: number; skipped: number };
+  submitted: SubmissionItem[];
+  skipped: SubmissionItem[];
+}
+
+export interface CoverLetterOutcome {
+  cover_letter_id: string;
+  body: string;
+  achievements_referenced: string[];
+  gaps: string[];
+}
+
+export const profileApi = {
+  get: () => request<ProfileResponse>("/profile"),
+  updateAnswers: (patch: Partial<ApplicationAnswers>) =>
+    request<{ answers: ApplicationAnswers; missing: string[]; ready_to_apply: boolean }>(
+      "/profile/answers",
+      { method: "PUT", body: JSON.stringify(patch) },
+    ),
+  updateVoice: (voice: string) =>
+    request<{ voice: string }>("/profile/voice", { method: "PUT", body: JSON.stringify({ voice }) }),
+  reload: () => request<ProfileResponse>("/profile/reload", { method: "POST" }),
+};
+
+export const applyApi = {
+  submit: (jobIds: string[]) =>
+    request<SubmitResponse>("/applications/submit", {
+      method: "POST",
+      body: JSON.stringify({ job_ids: jobIds }),
+    }),
+  confirmApplied: (jobId: string) =>
+    request<SubmissionItem>(`/applications/${jobId}/confirm-applied`, { method: "POST" }),
+  coverLetter: (jobId: string) =>
+    request<CoverLetterOutcome>(`/resumes/cover-letter/${jobId}`, { method: "POST" }),
+};
+
+/** True when a value is absent or still the backend's placeholder. */
+export function isUnanswered(value: unknown): boolean {
+  return value === null || value === undefined || value === "" || value === PLACEHOLDER;
+}

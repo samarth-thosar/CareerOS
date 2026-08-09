@@ -61,6 +61,9 @@ class JobModel(Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
     url: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=False)
+    # The posting's own location text, kept verbatim -- eligibility is decided from this, not from the
+    # parsed city/country, which are only filled in when a posting names a single place.
+    location_raw: Mapped[str | None] = mapped_column(String, nullable=True)
     location_city: Mapped[str | None] = mapped_column(String, nullable=True)
     location_country: Mapped[str | None] = mapped_column(String, nullable=True)
     remote_type: Mapped[str] = mapped_column(String, nullable=False)

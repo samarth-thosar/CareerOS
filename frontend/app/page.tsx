@@ -11,7 +11,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
-import { api, ApiError, type JobListResponse, type Overview } from "@/lib/api";
+import {
+  api,
+  ApiError,
+  applyApi,
+  type JobListResponse,
+  type Overview,
+  type SubmitResponse,
+} from "@/lib/api";
 import { JobRow } from "@/components/JobRow";
 import { ScoreBadge, ScoreStrip } from "@/components/ScoreStrip";
 import { Button, Card, EmptyState, ErrorNote, Eyebrow, StatusPill } from "@/components/ui";
@@ -34,6 +41,9 @@ export default function ShortlistPage() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // Selection is explicit and never inferred: CareerOS lists, the user picks, CareerOS applies.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [submission, setSubmission] = useState<SubmitResponse | null>(null);
 
   const query = useMemo(
     () => ({
@@ -75,6 +85,30 @@ export default function ShortlistPage() {
     }
   }
 
+  function toggle(jobId: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(jobId) ? next.delete(jobId) : next.add(jobId);
+      return next;
+    });
+  }
+
+  async function applyToSelected() {
+    setBusy("Applying");
+    setError(null);
+    setSubmission(null);
+    try {
+      setSubmission(await applyApi.submit([...selected]));
+      setSelected(new Set());
+      await load();
+    } catch (caught) {
+      // 409 means required profile answers are still blank -- an actionable message, not a failure to hide.
+      setError(caught instanceof ApiError ? caught.message : "Couldn't submit those applications.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const [top, ...rest] = jobs?.items ?? [];
 
   return (
@@ -82,6 +116,25 @@ export default function ShortlistPage() {
       {error && <ErrorNote message={error} />}
 
       <StatusStrip overview={overview} busy={busy} onDiscover={() => run("Finding jobs", api.discover)} onScore={() => run("Scoring", () => api.scoreBatch(10))} />
+
+      {submission && <SubmissionReport report={submission} />}
+
+      {selected.size > 0 && (
+        <div
+          className="sticky top-14 z-10 flex flex-wrap items-center gap-3 rounded-lg px-4 py-3"
+          style={{ background: "var(--surface)", boxShadow: "inset 0 0 0 1px var(--accent)" }}
+        >
+          <span className="text-sm">
+            <span className="tnum font-semibold">{selected.size}</span> selected
+          </span>
+          <Button onClick={applyToSelected} disabled={busy !== null}>
+            {busy === "Applying" ? "Applying…" : "Apply to selected"}
+          </Button>
+          <Button variant="quiet" onClick={() => setSelected(new Set())} disabled={busy !== null}>
+            Clear
+          </Button>
+        </div>
+      )}
 
       {top?.score_detail && <TopMatch job={top} />}
 
@@ -105,7 +158,13 @@ export default function ShortlistPage() {
         ) : (
           <ul>
             {(top ? [top, ...rest] : []).map((job) => (
-              <JobRow key={job.id} job={job} />
+              <JobRow
+                key={job.id}
+                job={job}
+                selectable
+                selected={selected.has(job.id)}
+                onToggle={toggle}
+              />
             ))}
           </ul>
         )}
@@ -268,5 +327,46 @@ function FilterRow({ filters, onChange }: { filters: Filters; onChange: (next: F
         Scored only
       </label>
     </div>
+  );
+}
+
+
+/**
+ * What actually happened to each selected job.
+ *
+ * Skips are reported as prominently as successes, with the reason: "no tailored resume yet" and
+ * "this board's forms are not automatable" need different actions from the user, and collapsing them into a
+ * single failure count would hide which.
+ */
+function SubmissionReport({ report }: { report: SubmitResponse }) {
+  return (
+    <Card>
+      <Eyebrow>
+        {report.counts.submitted} submitted · {report.counts.skipped} skipped
+      </Eyebrow>
+      {report.skipped.length > 0 && (
+        <ul className="space-y-2">
+          {report.skipped.map((item) => (
+            <li key={item.job_id} className="text-sm" style={{ color: "var(--ink-secondary)" }}>
+              <span style={{ color: "var(--status-warning)" }}>•</span> {item.reason}
+              {item.manual_url && (
+                <>
+                  {" — "}
+                  <a
+                    href={item.manual_url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="hover:underline"
+                    style={{ color: "var(--accent)" }}
+                  >
+                    open the form ↗
+                  </a>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }

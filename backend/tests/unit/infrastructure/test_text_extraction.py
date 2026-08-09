@@ -86,12 +86,33 @@ class TestParseLocation:
         assert parse_location(None).remote_type is RemoteType.UNKNOWN
         assert parse_location("   ").remote_type is RemoteType.UNKNOWN
 
-    def test_splits_greenhouse_bullet_separated_locations(self) -> None:
-        # Greenhouse writes locations as "San Francisco, CA • United States".
-        location = parse_location("San Francisco, CA • United States")
+    def test_raw_text_is_always_preserved(self) -> None:
+        # The raw string is the source of truth: eligibility is decided from it, not from city/country.
+        assert parse_location("San Francisco, CA • United States").raw == "San Francisco, CA • United States"
 
-        assert location.city == "San Francisco"
-        assert location.country == "United States"
+    def test_single_place_populates_city_and_country(self) -> None:
+        location = parse_location("Bengaluru, India")
+
+        assert (location.city, location.country) == ("Bengaluru", "India")
+
+    def test_abstains_on_multi_location_postings(self) -> None:
+        # Regression: three-plus fragments mean a *list* of places, not one. The old code took parts[0] and
+        # parts[-1], turning this into city="San Francisco", country="WA" -- a wrong city reads as fact, which
+        # is worse than none, and it now matters because location drives a work-authorisation filter.
+        location = parse_location("New York, San Francisco, Seattle, or Remote (US/Canada)")
+
+        assert location.city is None
+        assert location.country is None
+        assert location.raw is not None, "the full text must survive for eligibility to read"
+
+    def test_na_does_not_become_a_place(self) -> None:
+        # "N/A" split on "/" used to yield city="N", country="A".
+        location = parse_location("N/A")
+
+        assert location.city is None and location.country is None
+
+    def test_display_prefers_the_postings_own_words(self) -> None:
+        assert parse_location("Remote (US/Canada)").display == "Remote (US/Canada)"
 
 
 class TestParseSalary:

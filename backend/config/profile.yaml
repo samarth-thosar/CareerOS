@@ -105,14 +105,19 @@ skills:
 
 preferences:
   # One of: remote, hybrid, onsite, any
-  remote_preference: remote
+  # "any" rather than "remote": you asked for Pune/Bangalore roles, and scoring remote_fit against a
+  # remote-only preference was docking every one of them ~7 points for being in the cities you want.
+  remote_preference: any
   # Annual, in the currency you think in. Left unset because you have not given a figure -- jobs then score
   # salary_fit as "unknown" (50) rather than being penalised. Set it and low-paying roles start losing points.
   salary_floor: null
+  # Ordered by your stated preference: Pune and Bangalore first, Mumbai as a distant third.
   preferred_locations:
-    - Remote
-    - India
     - Pune
+    - Bangalore
+    - Bengaluru
+    - Remote (India)
+    - Mumbai
     - Hyderabad
   # Broad areas used for skill-area fit scoring.
   target_skill_areas:

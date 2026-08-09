@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from careeros.application.ports.job_source_provider import RawJobPosting, SearchCriteria
 from careeros.domain.job.job import RemoteType
+from careeros.domain.job.location_eligibility import is_worth_keeping
 from careeros.infrastructure.job_sources.text_extraction import matches_keyword
 
 
@@ -16,6 +17,11 @@ def posting_matches(posting: RawJobPosting, criteria: SearchCriteria) -> bool:
 
     Unset constraints are not applied, so an empty `SearchCriteria` keeps everything.
     """
+    # Work authorisation first: it is a hard constraint, and checking it before anything else means an
+    # ineligible posting never reaches the database or costs an LLM call to score.
+    if criteria.eligibility is not None and not is_worth_keeping(posting.location.raw, criteria.eligibility):
+        return False
+
     if criteria.remote_only and posting.location.remote_type is not RemoteType.REMOTE:
         return False
 

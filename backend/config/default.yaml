@@ -43,12 +43,28 @@ feature_flags:
 job_sources:
   greenhouse:
     enabled: true
-    # Greenhouse publishes no cross-company search API, so name the companies to watch.
-    # A token is the slug in boards.greenhouse.io/<token>. Add your own targets here.
+    # Greenhouse publishes no cross-company search API, so you name the companies to watch. A token is the slug
+    # in boards.greenhouse.io/<token>.
+    #
+    # These are chosen for companies that actually hire engineers in India. The earlier list (stripe, anthropic,
+    # figma) is a cautionary tale: it returned 224 jobs of which only 4 were in India and the rest needed US work
+    # authorisation, so the whole shortlist was unusable. Board tokens are guesses until a discovery run proves
+    # them -- one that 404s is logged and skipped, so a wrong token costs nothing but yields nothing either.
+    # VERIFIED by probing the API, not guessed. Each of these returns a live board with India-based engineering
+    # roles; an earlier hand-written list had 14 of 17 tokens 404 because company names are not board slugs.
+    # Re-probe before adding: a wrong token is silently skipped, so it costs nothing but yields nothing.
     board_tokens:
-      - stripe
-      - anthropic
-      - figma
+      - phonepe
+      - gitlab
+      - twilio
+      - hackerrank
+      - rubrik
+      - druva
+      - turing
+      - postman
+      - mongodb
+      - zenoti
+      - elastic
 
 discovery:
   # Matched against the job TITLE only. This is the filter that matters: every job kept here later costs one
@@ -75,6 +91,20 @@ discovery:
   # mentions "engineer", so adding broad terms here re-introduces the noise title_keywords just removed.
   keywords: []
   remote_only: false
+  # Where you can legally work. A posting naming only regions outside this list is dropped at the source --
+  # this is work authorisation, not preference, so it filters rather than merely scoring lower. It also catches
+  # region-locked remote ("US Remote", "Remote (US/Canada)"), which would otherwise slip through as plain remote.
+  # Clear the list to disable the check.
+  # Deliberately NOT including "remote": "US Remote" contains it, so listing it here would mark every
+  # region-locked US role eligible and defeat the filter. Bare "Remote" with no region named is already kept as
+  # unknown rather than dropped, and genuinely worldwide postings match on "worldwide"/"anywhere"/"global".
+  eligible_locations:
+    - india
+    - pune
+    - bangalore
+    - bengaluru
+    - mumbai
+    - hyderabad
   interval_seconds: 21600
   run_on_startup: false
 

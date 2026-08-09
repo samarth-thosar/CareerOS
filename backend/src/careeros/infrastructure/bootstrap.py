@@ -29,6 +29,7 @@ from careeros.application.ports.clock import Clock
 from careeros.application.ports.event_bus import EventBus
 from careeros.application.ports.id_generator import IdGenerator
 from careeros.application.ports.job_source_provider import JobSourceProvider, SearchCriteria
+from careeros.application.services.application_submission_service import ApplicationSubmissionService
 from careeros.application.services.application_tracker_service import ApplicationTrackerService
 from careeros.application.services.candidate_profile_service import CandidateProfileService
 from careeros.application.services.command_dispatcher import CommandDispatcher
@@ -39,8 +40,16 @@ from careeros.application.services.discovery_service import DiscoveryService
 from careeros.application.services.memory_service import MemoryService
 from careeros.application.services.resume_manager_service import ResumeManagerService
 from careeros.application.services.scoring_service import DimensionWeights, ScoringService
+from careeros.domain.candidate.application_answers import ApplicationAnswers
 from careeros.domain.candidate.candidate_profile import CandidateProfile
-from careeros.domain.events import JobDiscovered, JobScored
+from careeros.domain.job.location_eligibility import EligibilityRules
+from careeros.domain.events import (
+    CoverLetterGenerated,
+    JobDiscovered,
+    JobScored,
+    ResumeGenerated,
+)
+from careeros.infrastructure.config.answers_loader import load_answers, load_voice
 from careeros.infrastructure.config.profile_loader import load_profile
 from careeros.infrastructure.config.settings import Settings, load_settings
 from careeros.infrastructure.events.deferred_event_bus import DeferredEventBus
@@ -121,6 +130,10 @@ class Container:
     # Loaded once at startup: the bank is a file the user edits between runs, not per-request state. A reload
     # endpoint replaces it in place rather than each request re-reading YAML from disk.
     achievement_bank: AchievementBank | None
+    # Answers and voice are files the user edits between runs; reload endpoints replace them in place rather
+    # than each request re-reading from disk.
+    answers: ApplicationAnswers
+    voice: str
 
 
 def search_criteria_from(settings: Settings) -> SearchCriteria:
@@ -134,6 +147,11 @@ def search_criteria_from(settings: Settings) -> SearchCriteria:
         title_keywords=list(discovery.title_keywords),
         keywords=list(discovery.keywords),
         remote_only=discovery.remote_only,
+        eligibility=(
+            EligibilityRules.from_locations(list(discovery.eligible_locations))
+            if discovery.eligible_locations
+            else None
+        ),
     )
 
 
@@ -171,6 +189,8 @@ def build_container() -> Container:
         resume_renderer=LatexRenderer(engine=settings.resume.latex_engine or None),
         artifact_store=LocalArtifactStore(),
         achievement_bank=_load_bank_or_warn(),
+        answers=load_answers(),
+        voice=load_voice(),
     )
 
 
@@ -199,6 +219,7 @@ class Services:
     discovery: DiscoveryService
     scoring: ScoringService
     application_tracker: ApplicationTrackerService
+    submission: ApplicationSubmissionService
     candidate_profile: CandidateProfileService
     company_intelligence: CompanyIntelligenceService
     company_resolver: CompanyResolver
@@ -244,6 +265,15 @@ def build_services(container: Container, repos: Repositories, event_bus: EventBu
             id_generator=container.id_generator,
             auto_interested_threshold=container.settings.tracker.auto_interested_threshold,
         ),
+        submission=ApplicationSubmissionService(
+            application_repository=repos.applications,
+            job_repository=repos.jobs,
+            resume_repository=repos.resumes,
+            providers=container.job_source_providers,
+            answers=container.answers,
+            event_bus=event_bus,
+            clock=container.clock,
+        ),
         candidate_profile=CandidateProfileService(
             candidate_profile_repository=repos.candidate_profile,
         ),
@@ -274,6 +304,12 @@ def build_services(container: Container, repos: Repositories, event_bus: EventBu
         ),
         cover_letter=CoverLetterService(
             resume_repository=repos.resumes,
+            job_repository=repos.jobs,
+            company_repository=repos.companies,
+            candidate_profile_repository=repos.candidate_profile,
+            achievement_bank=container.achievement_bank,
+            answers=container.answers,
+            voice=container.voice,
             llm_provider=container.llm_provider,
             event_bus=event_bus,
             clock=container.clock,
@@ -316,8 +352,22 @@ def register_event_handlers(container: Container) -> None:
     async def on_job_scored(event: JobScored) -> None:
         await in_session(container, lambda s: s.application_tracker.apply_score(event.job_id, event.value))
 
+    async def on_resume_generated(event: ResumeGenerated) -> None:
+        await in_session(
+            container,
+            lambda s: s.application_tracker.attach_resume(event.job_id, event.resume_version_id),
+        )
+
+    async def on_cover_letter_generated(event: CoverLetterGenerated) -> None:
+        await in_session(
+            container,
+            lambda s: s.application_tracker.record_cover_letter(event.job_id, event.cover_letter_id),
+        )
+
     container.event_bus.subscribe(JobDiscovered, on_job_discovered)
     container.event_bus.subscribe(JobScored, on_job_scored)
+    container.event_bus.subscribe(ResumeGenerated, on_resume_generated)
+    container.event_bus.subscribe(CoverLetterGenerated, on_cover_letter_generated)
 
 
 def register_scheduled_jobs(container: Container) -> None:

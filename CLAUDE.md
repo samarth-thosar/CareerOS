@@ -51,11 +51,45 @@ and the map of the system — manual DI, no framework.
 made subscribers contend with the publisher's write lock (SQLite reports that as "database is locked").
 Handlers each get their own transaction, so they must be idempotent.
 
-**12 events exist; only `JobDiscovered` and `JobScored` have subscribers.** Known gap: `ResumeGenerated` has
-none, so tailoring a resume does not advance the application to `resume_generated`.
+**12 events exist; 4 have subscribers** (`JobDiscovered`, `JobScored`, `ResumeGenerated`,
+`CoverLetterGenerated`). `ResumeGenerated` -> `attach_resume` is load-bearing: `Application.apply()` only
+permits submission from `resume_generated`, so without it every application would be unsubmittable.
 
 **Read models** (`persistence/read_models.py`, `analytics_read_model.py`) bypass aggregates for queries —
 light CQRS. Repositories rebuild aggregates for writes.
+
+## Location / work authorisation (load-bearing)
+
+The candidate can work **in India only** — Pune and Bangalore preferred, Mumbai a distant third, remote-in-India
+fine. No US work permit. `domain/job/location_eligibility.py` filters ineligible postings at the source, before
+they reach the database or cost an LLM call.
+
+It is an **allowlist, deliberately**. A blocklist of ineligible countries was tried first and leaked Norway,
+Greece and Romania, because no hand-written country list is ever complete. The question is "does this name a
+place I can work in?", so an unfamiliar location fails closed.
+
+Two traps: **`remote_type == REMOTE` does not mean "anyone may apply"** — "US Remote" and "Remote (US/Canada)"
+are region-locked, and treating remote as open is the most expensive mistake here. And **never put `remote` in
+`eligible_locations`**: "US Remote" contains it, which would re-admit every US role.
+
+`Location.raw` is the source of truth. `city`/`country` are populated only for single-location postings, because
+Greenhouse writes "New York, San Francisco, Seattle, or Remote (US/Canada)" in one field and guessing one pair
+from that produced city="San Francisco", country="WA".
+
+**Greenhouse board tokens are not company names.** A hand-written list had 14 of 17 404. The 11 in
+`config/default.yaml` were verified by probing the API; re-probe before adding more (a bad token is silently
+skipped, so it costs nothing and yields nothing).
+
+## Applying
+
+The user's model: **CareerOS lists, the user picks, CareerOS applies.** Selection is always explicit — the
+system never chooses which jobs to apply to. `ApplicationSubmissionService` refuses a batch unless every
+required answer in `config/application_answers.yaml` is filled (no invented notice period reaches a real
+employer), a tailored resume exists, and the job was never applied to before.
+
+No source supports automated submission yet (`supports_auto_submit` is False everywhere), so submissions report
+`needs_manual_step` with the form URL rather than pretending. `POST /applications/{job_id}/confirm-applied`
+records a manually submitted form so the never-apply-twice guard and outcome metrics stay correct.
 
 ## Non-negotiable product rules
 
@@ -87,12 +121,15 @@ light CQRS. Repositories rebuild aggregates for writes.
 | `backend/config/profile.yaml` | Skills, role priorities, preferences. `years_experience: 2` is a judgment call worth confirming. |
 | `backend/data/master/resume.tex` | Real resume + 4 `%%CAREEROS:*%%` markers. Each must appear **exactly once** — a marker inside a comment gets substituted too, and multi-line blocks then escape the comment. |
 | `backend/data/master/achievements.yaml` | The honesty ceiling for generated resumes. Bullets use block scalars (`>-`): plain scalars break on `word: **bold**`. |
+| `backend/config/application_answers.yaml` | Notice period, expected CTC, work authorisation. `TODO` blocks submission by design. Editable at `/profile`. |
+| `backend/data/master/voice.md` | Cover-letter voice and angle. Shapes framing only — facts still come from the achievement bank. |
 | `backend/.env` | Gitignored. Holds the Tectonic path. |
 | `resume-current.tex` | Untouched original, repo root. |
 
 ## Status
 
-Done: architecture, discovery (Greenhouse), scoring, resume tailoring + PDF (Tectonic), dashboard.
-Pending: **applying** (the big one — user selects from the list, system submits), cover letters, tracker states
-beyond `interested`, email/rejection detection, WhatsApp, memory, company intelligence, more job sources
-(Wellfound not yet built), Overleaf sync.
+Done: architecture, discovery (Greenhouse, India-filtered), scoring, resume tailoring + PDF, cover letters,
+dashboard (shortlist/pipeline/insights/gaps/profile), select-and-apply flow with tracking.
+Pending: **automated form submission** (needs per-source browser automation; everything up to the submit button
+works), email/rejection detection, WhatsApp, memory, company intelligence, more job sources (Wellfound, Lever,
+Ashby), Overleaf sync.

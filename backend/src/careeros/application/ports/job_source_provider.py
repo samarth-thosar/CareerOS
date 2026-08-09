@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Protocol
 
 from careeros.domain.job.job import Location, SalaryRange
+from careeros.domain.job.location_eligibility import EligibilityRules
 
 
 @dataclass(slots=True)
@@ -34,6 +35,11 @@ class SearchCriteria:
     title_keywords: list[str] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)
     remote_only: bool = False
+
+    # Work-authorisation filter. When set, postings whose location names only regions the candidate cannot work
+    # in are dropped at the source, before they ever reach the database or cost an LLM call to score. This is a
+    # legal constraint rather than a preference, which is why it filters rather than merely lowering a score.
+    eligibility: EligibilityRules | None = None
 
 
 @dataclass(slots=True)

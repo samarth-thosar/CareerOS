@@ -36,7 +36,14 @@ def _latest_score_subquery() -> Select:
     )
 
 
-def _format_location(city: str | None, country: str | None) -> str | None:
+def _format_location(raw: str | None, city: str | None, country: str | None) -> str | None:
+    """Prefer the posting's own words.
+
+    `city`/`country` are only populated for single-location postings, so falling back to them second means a
+    multi-location posting shows its real text ("Pune, India or Remote") instead of nothing.
+    """
+    if raw and raw.strip():
+        return raw.strip()
     parts = [part for part in (city, country) if part]
     return ", ".join(parts) if parts else None
 
@@ -121,7 +128,7 @@ class JobReadModel:
                 title=job.title,
                 company_name=company_name,
                 url=job.url,
-                location=_format_location(job.location_city, job.location_country),
+                location=_format_location(job.location_raw, job.location_city, job.location_country),
                 remote_type=job.remote_type,
                 salary_min=job.salary_min,
                 salary_max=job.salary_max,
@@ -164,7 +171,7 @@ class JobReadModel:
                 title=job.title,
                 company_name=company_name,
                 url=job.url,
-                location=_format_location(job.location_city, job.location_country),
+                location=_format_location(job.location_raw, job.location_city, job.location_country),
                 remote_type=job.remote_type,
                 salary_min=job.salary_min,
                 salary_max=job.salary_max,
