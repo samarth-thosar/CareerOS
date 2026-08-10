@@ -283,6 +283,7 @@ def build_services(container: Container, repos: Repositories, event_bus: EventBu
             application_repository=repos.applications,
             job_repository=repos.jobs,
             resume_repository=repos.resumes,
+            company_repository=repos.companies,
             providers=container.job_source_providers,
             answers=container.answers,
             event_bus=event_bus,

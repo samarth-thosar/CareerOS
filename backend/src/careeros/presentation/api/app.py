@@ -56,6 +56,8 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         await container.scheduler.shutdown()
+        # Closes any review tabs still open. Only on shutdown -- never on a timer mid-review.
+        await container.form_filler.close()
         await container.engine.dispose()
 
 

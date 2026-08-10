@@ -102,11 +102,23 @@ system never chooses which jobs to apply to. `ApplicationSubmissionService` refu
 required answer in `config/application_answers.yaml` is filled (no invented notice period reaches a real
 employer), a tailored resume exists, and the job was never applied to before.
 
-`POST /applications/{job_id}/prepare-form` drafts the form in the candidate's **own visible Chrome** via
-Playwright `channel="chrome"` (which sidesteps the Chromium download that OOMs here), fills name/email/phone/
-links, uploads the tailored resume PDF, pastes the cover letter — and **stops before submit**. Verified on a live
-GitLab Greenhouse form. `unfilled` is a first-class result and is pruned of false alarms (a form with separate
-first/last fields must not report "Full name" missing), because a noisy list is one the user stops reading.
+`POST /applications/prepare-forms` takes a list of job ids and opens **one tab per job in a single visible
+Chrome**, each with the form drafted: name/email/phone/links filled, tailored resume PDF uploaded, cover letter
+pasted — and **stops before submit**. Verified live across GitLab, Postman and Zenoti Greenhouse forms.
+
+Two things this got wrong first, both found by asking "what do I see when I come back?":
+- It launched a **browser per job**, so ten jobs meant ten Chrome processes. The browser is now held for the
+  process lifetime and tabs are added to it; a second batch adds tabs rather than launching again.
+- It **closed after 15 minutes**, which would silently discard a half-reviewed application. Nothing closes on a
+  timer now — only on app shutdown (`form_filler.close()` in the lifespan).
+
+Playwright uses `channel="chrome"` to drive the installed browser, sidestepping the Chromium download that OOMs
+here. `MAX_TABS_PER_BATCH` is 12: Chrome copes with more, a human reviewing forms does not. `unfilled` is a
+first-class result and pruned of false alarms (a form with separate first/last fields must not report "Full name"
+missing), because a noisy list is one the user stops reading.
+
+The long-lived browser is bound to the event loop that started it. Fine under uvicorn (one loop per process);
+scripts driving it must use a single `asyncio.run`.
 
 **Do not build bot-detection evasion.** The user asked for automation that "doesn't feel like a bot" on
 Wellfound. Declined: its purpose is circumventing a security control, it breaks Wellfound's terms, and the

@@ -73,17 +73,30 @@ async def confirm_applied(
     return asdict(outcome)
 
 
-@router.post("/{job_id}/prepare-form")
-async def prepare_form(
-    job_id: str,
+@router.post("/prepare-forms")
+async def prepare_forms(
     container: Annotated[Container, Depends(get_container)],
+    payload: Annotated[dict[str, Any], Body()],
 ) -> dict[str, Any]:
-    """Open the application form in your browser with everything we know already filled in.
+    """Open one browser tab per selected job, each with the form already drafted.
 
-    Stops before submit: you review and press the button. Returns `unfilled` so you know exactly which fields
-    still need you rather than having to audit the whole form.
+    Tabs stay open until you close them -- nothing is submitted and nothing times out. `skipped` explains any
+    job that was not opened (already applied, no tailored resume yet, over the tab limit).
     """
-    result = await in_session(container, lambda s: s.submission.prepare_form(job_id))
-    if result.error:
-        raise HTTPException(status.HTTP_409_CONFLICT, result.error)
-    return asdict(result)
+    job_ids = payload.get("job_ids")
+    if not isinstance(job_ids, list) or not job_ids:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Expected a non-empty 'job_ids' list")
+
+    try:
+        batch = await in_session(
+            container, lambda s: s.submission.prepare_forms([str(j) for j in job_ids])
+        )
+    except AnswersIncompleteError as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
+
+    return {
+        "counts": batch.counts,
+        "browser_left_open": batch.browser_left_open,
+        "prepared": [asdict(item) for item in batch.prepared],
+        "skipped": [asdict(item) for item in batch.skipped],
+    }

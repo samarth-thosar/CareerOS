@@ -24,12 +24,22 @@ from dataclasses import dataclass, field
 
 from careeros.application.ports.clock import Clock
 from careeros.application.ports.event_bus import EventBus
-from careeros.application.ports.form_filler import FormFillRequest, FormFillResult, FormFiller
+from careeros.application.ports.form_filler import (
+    BatchFormFillResult,
+    FormFillRequest,
+    FormFillResult,
+    FormFiller,
+)
 from careeros.application.ports.job_source_provider import JobSourceProvider
 from careeros.domain.application.application import AlreadyAppliedError, ApplicationStatus
 from careeros.domain.candidate.application_answers import ApplicationAnswers
 from careeros.domain.events import ApplicationStatusChanged, ApplicationSubmitted
-from careeros.domain.repositories import ApplicationRepository, JobRepository, ResumeRepository
+from careeros.domain.repositories import (
+    ApplicationRepository,
+    CompanyRepository,
+    JobRepository,
+    ResumeRepository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +73,7 @@ class ApplicationSubmissionService:
         application_repository: ApplicationRepository,
         job_repository: JobRepository,
         resume_repository: ResumeRepository,
+        company_repository: CompanyRepository,
         providers: list[JobSourceProvider],
         answers: ApplicationAnswers,
         event_bus: EventBus,
@@ -72,6 +83,7 @@ class ApplicationSubmissionService:
         self._application_repository = application_repository
         self._job_repository = job_repository
         self._resume_repository = resume_repository
+        self._company_repository = company_repository
         self._providers = {provider.name: provider for provider in providers}
         self._answers = answers
         self._event_bus = event_bus
@@ -156,52 +168,73 @@ class ApplicationSubmissionService:
         )
         return SubmissionResult(job_id=job.id, submitted=True)
 
-    async def prepare_form(self, job_id: str) -> FormFillResult:
-        """Draft the application form in the candidate's browser, stopping before submit.
+    async def prepare_forms(self, job_ids: list[str]) -> BatchFormFillResult:
+        """Open one tab per selected job, each with the form already drafted, and leave them for review.
 
-        Refuses on the same grounds as submission -- incomplete answers, no tailored resume, already applied --
-        because a form drafted from placeholder answers is a trap, not a head start.
+        Batched because the workflow is "queue several, come back, review them together" -- one browser with N
+        tabs, not N browsers. Per-job refusals are reported rather than raised so one unready job does not
+        abandon the rest of the batch; incomplete answers are the exception, since that blocks everything and
+        saying so once is clearer than repeating it per job.
         """
         if self._form_filler is None or not self._form_filler.is_available():
-            return FormFillResult(
-                error="Browser automation is unavailable (Playwright not installed)", left_open_for_review=False
+            return BatchFormFillResult(
+                skipped=[
+                    FormFillResult(job_id=job_id, error="Browser automation unavailable (Playwright missing)")
+                    for job_id in job_ids
+                ]
             )
 
         missing = self._answers.missing_fields()
         if missing:
-            return FormFillResult(
-                error="These answers still need you first: " + ", ".join(missing), left_open_for_review=False
+            raise AnswersIncompleteError(
+                "These answers still need you before any form can be drafted: " + ", ".join(missing)
             )
 
+        requests: list[FormFillRequest] = []
+        upfront_skips: list[FormFillResult] = []
+        for job_id in job_ids:
+            request, reason = await self._build_request(job_id)
+            if request is None:
+                upfront_skips.append(FormFillResult(job_id=job_id, error=reason))
+            else:
+                requests.append(request)
+
+        batch = await self._form_filler.prepare(requests)
+        batch.skipped = [*upfront_skips, *batch.skipped]
+        return batch
+
+    async def _build_request(self, job_id: str) -> tuple[FormFillRequest | None, str | None]:
+        """Assemble one form-fill request, or explain why this job is not ready for one."""
         job = await self._job_repository.get_by_id(job_id)
         application = await self._application_repository.get_by_job_id(job_id)
         if job is None or application is None:
-            return FormFillResult(error="Job is not tracked", left_open_for_review=False)
+            return None, "job is not tracked"
         if application.applied_at is not None:
-            return FormFillResult(
-                error=f"Already applied on {application.applied_at:%Y-%m-%d}", left_open_for_review=False
-            )
+            return None, f"already applied on {application.applied_at:%Y-%m-%d}"
 
         versions = await self._resume_repository.list_versions_for_job(job_id)
-        rendered = next((v for v in versions if v.pdf_path), None)
+        rendered = next((version for version in versions if version.pdf_path), None)
         if rendered is None:
-            return FormFillResult(
-                error="No tailored resume PDF for this job yet — tailor one first",
-                left_open_for_review=False,
-            )
+            return None, "no tailored resume PDF yet — tailor one first"
 
         letter = None
         if application.current_cover_letter_id:
             stored = await self._resume_repository.get_cover_letter(application.current_cover_letter_id)
             letter = stored.content if stored else None
 
-        return await self._form_filler.prepare(
+        # Company name is for the review report, so the candidate can tell the tabs apart at a glance.
+        company = await self._company_repository.get_by_id(job.company_id)
+        return (
             FormFillRequest(
+                job_id=job_id,
+                job_title=job.title,
+                company_name=company.name if company else "unknown",
                 job_url=job.url,
                 answers=_form_answers(self._answers),
                 resume_pdf_path=rendered.pdf_path,
                 cover_letter=letter,
-            )
+            ),
+            None,
         )
 
     async def confirm_manual_submission(self, job_id: str) -> SubmissionResult:

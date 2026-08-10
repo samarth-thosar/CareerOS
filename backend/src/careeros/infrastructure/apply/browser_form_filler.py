@@ -1,30 +1,40 @@
-"""BrowserFormFiller -- drafts an application form in the candidate's own visible Chrome.
+"""BrowserFormFiller -- drafts application forms as tabs in the candidate's own visible Chrome.
 
 Runs **non-headless on purpose**. The candidate watches it work and presses submit themselves, which is what
 makes this assistance rather than an unattended bot: the browser is theirs, the session is theirs, the
-irreversible action is theirs. Nothing here tries to look human to a bot detector -- that would be
-circumventing a security control, and this deliberately does not do it. Consequently it only works on forms
-that are not fighting automation: Greenhouse, Lever and Ashby application pages, which is where every job
-CareerOS discovers actually lives.
+irreversible action is theirs. Nothing here tries to look human to a bot detector -- that would be circumventing
+a security control, and this deliberately does not do it. Consequently it only works on forms that are not
+fighting automation: Greenhouse, Lever and Ashby application pages, which is where every job CareerOS discovers
+actually lives.
 
-Uses `channel="chrome"` to drive the installed browser instead of Playwright's bundled Chromium, because the
+Two decisions the intended workflow forced, both learned by asking "what do I see when I come back?":
+
+* **One browser, one tab per job.** An earlier version launched a fresh browser per call, so ten jobs meant ten
+  Chrome processes -- untenable on a laptop already sharing memory with a local LLM. The browser is now held for
+  the process lifetime and tabs are added to it.
+* **Never closed on a timer.** That earlier version also closed after fifteen minutes, which would silently
+  discard a half-reviewed application. The window stays open until the candidate closes it, or until the app
+  shuts down.
+
+Uses `channel="chrome"` to drive the installed browser rather than Playwright's bundled Chromium, because the
 Chromium download OOMs on this machine and the installed Chrome works fine.
-
-Field matching is best-effort and reports what it could not fill. ATS forms carry arbitrary custom questions,
-and pretending to have completed one would be worse than naming it -- so `unfilled` is a first-class result.
 """
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
 
-from careeros.application.ports.form_filler import FormFillRequest, FormFillResult
+from careeros.application.ports.form_filler import (
+    BatchFormFillResult,
+    FormFillRequest,
+    FormFillResult,
+)
 
 logger = logging.getLogger(__name__)
 
-# How long to leave the window open for the candidate to review and submit. Generous: reading a job form and
-# deciding to send it is not a five-second task.
-_REVIEW_WINDOW_MS = 15 * 60 * 1000
+# A soft ceiling on tabs per batch. Chrome copes with more, but a human reviewing thirty application forms in one
+# sitting does not, and each tab holds a form with the candidate's real details in it.
+MAX_TABS_PER_BATCH = 12
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,11 +69,7 @@ FIELDS: tuple[FieldSpec, ...] = (
         "Location",
         ("input[name*='location']", "input#location", "input[aria-label*='location' i]"),
     ),
-    FieldSpec(
-        "portfolio_url",
-        "Portfolio / website",
-        ("input[name*='website']", "input[name*='portfolio']"),
-    ),
+    FieldSpec("portfolio_url", "Portfolio / website", ("input[name*='website']", "input[name*='portfolio']")),
 )
 
 _RESUME_SELECTORS = (
@@ -79,6 +85,14 @@ _COVER_LETTER_SELECTORS = (
     "textarea",
 )
 
+# Fields where a form asks for the same fact one of two ways. Reporting the unused variant as "unfilled" is a
+# false alarm, and a noisy unfilled list is one the candidate stops reading -- which defeats the point.
+_EITHER_OR: dict[str, frozenset[str]] = {
+    "Full name": frozenset({"First name", "Last name"}),
+    "First name": frozenset({"Full name"}),
+    "Last name": frozenset({"Full name"}),
+}
+
 
 class BrowserFormFiller:
     name = "browser"
@@ -87,6 +101,10 @@ class BrowserFormFiller:
         # headless=False is the default and the point: the candidate watches and submits.
         self._headless = headless
         self._channel = channel
+        # Held for the process lifetime so repeated batches add tabs to one window instead of spawning browsers.
+        self._playwright = None
+        self._browser = None
+        self._context = None
 
     def is_available(self) -> bool:
         try:
@@ -95,43 +113,81 @@ class BrowserFormFiller:
             return False
         return True
 
-    async def prepare(self, request: FormFillRequest) -> FormFillResult:
-        if not self.is_available():
-            return FormFillResult(error="Playwright is not installed", left_open_for_review=False)
-
+    async def _ensure_browser(self):
+        """Start the browser on first use, or reuse it -- including after the candidate closed the window."""
         from playwright.async_api import async_playwright
 
-        result = FormFillResult()
-        try:
-            async with async_playwright() as playwright:
-                browser = await playwright.chromium.launch(channel=self._channel, headless=self._headless)
-                context = await browser.new_context()
-                page = await context.new_page()
-                await page.goto(request.job_url, wait_until="domcontentloaded", timeout=60_000)
+        if self._playwright is None:
+            self._playwright = await async_playwright().start()
 
-                # Many ATS pages put the form behind an "Apply" button rather than showing it inline.
-                await self._reveal_form(page)
+        if self._browser is None or not self._browser.is_connected():
+            self._browser = await self._playwright.chromium.launch(
+                channel=self._channel, headless=self._headless
+            )
+            self._context = await self._browser.new_context(accept_downloads=True)
+        return self._context
 
-                await self._fill_text_fields(page, request, result)
-                await self._attach_resume(page, request, result)
-                await self._fill_cover_letter(page, request, result)
+    async def prepare(self, requests: list[FormFillRequest]) -> BatchFormFillResult:
+        batch = BatchFormFillResult()
+        if not requests:
+            return batch
 
-                logger.info(
-                    "Prepared %s: filled %s; still needs %s",
-                    request.job_url, result.filled, result.unfilled or "nothing",
+        if not self.is_available():
+            batch.skipped = [
+                FormFillResult(job_id=r.job_id, job_title=r.job_title, company_name=r.company_name,
+                               error="Playwright is not installed")
+                for r in requests
+            ]
+            return batch
+
+        queued, overflow = requests[:MAX_TABS_PER_BATCH], requests[MAX_TABS_PER_BATCH:]
+        for request in overflow:
+            batch.skipped.append(
+                FormFillResult(
+                    job_id=request.job_id,
+                    job_title=request.job_title,
+                    company_name=request.company_name,
+                    error=f"Not opened — batch limit is {MAX_TABS_PER_BATCH} tabs. Run again for the rest.",
                 )
+            )
 
-                if self._headless:
-                    await browser.close()
-                    result.left_open_for_review = False
-                else:
-                    # Left open on purpose: the candidate reviews and presses submit. Never clicked here.
-                    await page.wait_for_timeout(_REVIEW_WINDOW_MS)
-                    await browser.close()
-        except Exception as error:  # noqa: BLE001 - report any browser failure rather than crashing the request
-            logger.exception("Could not prepare the form at %s", request.job_url)
+        try:
+            context = await self._ensure_browser()
+        except Exception as error:  # noqa: BLE001
+            logger.exception("Could not start the browser")
+            batch.skipped.extend(
+                FormFillResult(job_id=r.job_id, job_title=r.job_title, company_name=r.company_name,
+                               error=f"{type(error).__name__}: {error}")
+                for r in queued
+            )
+            return batch
+
+        for request in queued:
+            result = await self._prepare_one(context, request)
+            (batch.skipped if result.error else batch.prepared).append(result)
+
+        batch.tabs_open = len(context.pages)
+        # Never closed here: the candidate reviews and submits in their own time, then closes the window.
+        batch.browser_left_open = True
+        logger.info("Prepared %d forms across %d tabs", len(batch.prepared), batch.tabs_open)
+        return batch
+
+    async def _prepare_one(self, context, request: FormFillRequest) -> FormFillResult:
+        result = FormFillResult(
+            job_id=request.job_id, job_title=request.job_title, company_name=request.company_name
+        )
+        try:
+            page = await context.new_page()
+            await page.goto(request.job_url, wait_until="domcontentloaded", timeout=60_000)
+            # Many ATS pages put the form behind an "Apply" button rather than showing it inline.
+            await self._reveal_form(page)
+
+            await self._fill_text_fields(page, request, result)
+            await self._attach_resume(page, request, result)
+            await self._fill_cover_letter(page, request, result)
+        except Exception as error:  # noqa: BLE001 - one bad form must not abandon the rest of the batch
+            logger.exception("Could not prepare %s", request.job_url)
             result.error = f"{type(error).__name__}: {error}"
-
         return result
 
     async def _reveal_form(self, page) -> None:
@@ -155,7 +211,6 @@ class BrowserFormFiller:
                 result.filled.append(spec.label)
             else:
                 result.unfilled.append(spec.label)
-
         _prune_satisfied_alternatives(result)
 
     async def _try_fill(self, page, selectors: tuple[str, ...], value: str) -> bool:
@@ -196,21 +251,21 @@ class BrowserFormFiller:
         else:
             result.unfilled.append("Cover letter")
 
-
-# Fields where the form asks for the same fact one of two ways. Reporting the unused variant as "unfilled" is a
-# false alarm, and a noisy unfilled list is one the candidate stops reading -- which defeats the point of having
-# it. Key is the label to drop; value is the set of labels that, together, already cover it.
-_EITHER_OR: dict[str, frozenset[str]] = {
-    "Full name": frozenset({"First name", "Last name"}),
-    "First name": frozenset({"Full name"}),
-    "Last name": frozenset({"Full name"}),
-}
+    async def close(self) -> None:
+        """Shut the browser down. Called on app shutdown, never mid-review."""
+        try:
+            if self._browser is not None and self._browser.is_connected():
+                await self._browser.close()
+        finally:
+            self._browser = None
+            self._context = None
+            if self._playwright is not None:
+                await self._playwright.stop()
+                self._playwright = None
 
 
 def _prune_satisfied_alternatives(result: FormFillResult) -> None:
     filled = set(result.filled)
     result.unfilled = [
-        label
-        for label in result.unfilled
-        if not (label in _EITHER_OR and _EITHER_OR[label] <= filled)
+        label for label in result.unfilled if not (label in _EITHER_OR and _EITHER_OR[label] <= filled)
     ]
