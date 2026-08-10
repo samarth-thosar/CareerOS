@@ -96,8 +96,24 @@ class GreenhouseSettings(BaseModel):
     board_tokens: list[str] = []
 
 
+class LeverSettings(BaseModel):
+    """Lever's public postings API. A slug is the company name in `jobs.lever.co/<slug>`."""
+
+    enabled: bool = True
+    company_slugs: list[str] = []
+
+
+class AshbySettings(BaseModel):
+    """Ashby's public job-board API. A slug is the company name in `jobs.ashbyhq.com/<slug>`."""
+
+    enabled: bool = True
+    company_slugs: list[str] = []
+
+
 class JobSourceSettings(BaseModel):
     greenhouse: GreenhouseSettings = GreenhouseSettings()
+    lever: LeverSettings = LeverSettings()
+    ashby: AshbySettings = AshbySettings()
 
 
 class DiscoverySettings(BaseModel):

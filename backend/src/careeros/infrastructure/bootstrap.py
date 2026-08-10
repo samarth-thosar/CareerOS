@@ -54,7 +54,9 @@ from careeros.infrastructure.config.profile_loader import load_profile
 from careeros.infrastructure.config.settings import Settings, load_settings
 from careeros.infrastructure.events.deferred_event_bus import DeferredEventBus
 from careeros.infrastructure.events.in_process_event_bus import InProcessEventBus
+from careeros.infrastructure.job_sources.ashby_provider import AshbyProvider
 from careeros.infrastructure.job_sources.greenhouse_provider import GreenhouseProvider
+from careeros.infrastructure.job_sources.lever_provider import LeverProvider
 from careeros.infrastructure.llm.ollama_provider import OllamaProvider
 from careeros.infrastructure.persistence.db import create_engine, create_session_factory, session_scope
 from careeros.domain.resume.achievement import AchievementBank
@@ -161,6 +163,15 @@ def build_job_source_providers(settings: Settings) -> list[JobSourceProvider]:
     greenhouse = settings.job_sources.greenhouse
     if greenhouse.enabled and greenhouse.board_tokens:
         providers.append(GreenhouseProvider(board_tokens=list(greenhouse.board_tokens)))
+
+    lever = settings.job_sources.lever
+    if lever.enabled and lever.company_slugs:
+        providers.append(LeverProvider(company_slugs=list(lever.company_slugs)))
+
+    ashby = settings.job_sources.ashby
+    if ashby.enabled and ashby.company_slugs:
+        providers.append(AshbyProvider(company_slugs=list(ashby.company_slugs)))
+
     return providers
 
 

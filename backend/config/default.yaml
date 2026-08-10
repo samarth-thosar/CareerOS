@@ -72,6 +72,22 @@ job_sources:
       - zenoti
       - elastic
 
+  # Lever's public postings API -- api.lever.co/v0/postings/<slug>?mode=json. Verified by probing.
+  lever:
+    enabled: true
+    company_slugs:
+      - meesho
+      - mindtickle
+      - cred
+
+  # Ashby's public job-board API -- api.ashbyhq.com/posting-api/job-board/<slug>. Verified by probing.
+  ashby:
+    enabled: true
+    company_slugs:
+      - atlan
+      - openai
+      - skyflow
+
 discovery:
   # Matched against the job TITLE only. This is the filter that matters: every job kept here later costs one
   # local LLM call to score, so keeping it tight is the difference between minutes and hours of inference.

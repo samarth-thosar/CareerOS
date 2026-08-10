@@ -31,8 +31,9 @@ Worked around by `.venv/Lib/site-packages/sitecustomize.py` (gitignored) seeding
 `backend/scripts/wmi_workaround.py`.** If diagnosing something similar: `platform.release()` and
 `platform.version()` also route through `uname()`, so they cannot be used inside the workaround.
 
-**Don't leave the backend running unattended.** Its scheduler fires a scoring batch every 15 min — 20 jobs ×
-~40s of local inference — which reloads qwen3 and can saturate the machine.
+**Set `CAREEROS_SCHEDULER__ENABLED=false` while working interactively.** One Ollama instance serialises
+generation, so a scheduled 20-job scoring batch queues ahead of an interactive tailoring request and times it
+out. Leaving the backend running unattended also reloads qwen3 every 15 min and can saturate the machine.
 
 **Scoring is slow: ~40s/job.** 218 unscored ≈ 2.5h. Batches are bounded and resumable by design; the queue is
 "jobs with no Score row", which survives restarts.
@@ -76,9 +77,23 @@ are region-locked, and treating remote as open is the most expensive mistake her
 Greenhouse writes "New York, San Francisco, Seattle, or Remote (US/Canada)" in one field and guessing one pair
 from that produced city="San Francisco", country="WA".
 
-**Greenhouse board tokens are not company names.** A hand-written list had 14 of 17 404. The 11 in
-`config/default.yaml` were verified by probing the API; re-probe before adding more (a bad token is silently
+**Board slugs are not company names.** A hand-written Greenhouse list had 14 of 17 404. Every slug in
+`config/default.yaml` was verified by probing the API; re-probe before adding more (a bad slug is silently
 skipped, so it costs nothing and yields nothing).
+
+**Three sources, all free public APIs, no scraping:** Greenhouse
+(`boards-api.greenhouse.io/v1/boards/<token>/jobs?content=true`), Lever
+(`api.lever.co/v0/postings/<slug>?mode=json`), Ashby
+(`api.ashbyhq.com/posting-api/job-board/<slug>`). None has cross-company search, so companies are named in
+config. Payload shapes differ: Lever puts the title in `text`, the location in `categories.location`, and
+timestamps in epoch millis; Ashby exposes `isListed`, and unlisted postings are skipped since they cannot be
+applied to.
+
+**Wellfound is not viable and this was checked, not assumed.** It sits behind Cloudflare bot protection — a
+filtered listing URL returns 403, and even pages that load block on a second request — publishes no API, gates
+most listings behind a login, and forbids scraping. Lever and Ashby cover the same startup postings through
+documented endpoints. Don't spend time on Wellfound without a logged-in browser session, and note that route
+violates their terms.
 
 ## Applying
 
@@ -131,5 +146,5 @@ records a manually submitted form so the never-apply-twice guard and outcome met
 Done: architecture, discovery (Greenhouse, India-filtered), scoring, resume tailoring + PDF, cover letters,
 dashboard (shortlist/pipeline/insights/gaps/profile), select-and-apply flow with tracking.
 Pending: **automated form submission** (needs per-source browser automation; everything up to the submit button
-works), email/rejection detection, WhatsApp, memory, company intelligence, more job sources (Wellfound, Lever,
-Ashby), Overleaf sync.
+works), email/rejection detection, WhatsApp, memory, company intelligence, more job sources (Wellfound blocked — see above),
+Overleaf sync.
