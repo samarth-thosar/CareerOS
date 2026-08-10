@@ -102,9 +102,21 @@ system never chooses which jobs to apply to. `ApplicationSubmissionService` refu
 required answer in `config/application_answers.yaml` is filled (no invented notice period reaches a real
 employer), a tailored resume exists, and the job was never applied to before.
 
-No source supports automated submission yet (`supports_auto_submit` is False everywhere), so submissions report
-`needs_manual_step` with the form URL rather than pretending. `POST /applications/{job_id}/confirm-applied`
-records a manually submitted form so the never-apply-twice guard and outcome metrics stay correct.
+`POST /applications/{job_id}/prepare-form` drafts the form in the candidate's **own visible Chrome** via
+Playwright `channel="chrome"` (which sidesteps the Chromium download that OOMs here), fills name/email/phone/
+links, uploads the tailored resume PDF, pastes the cover letter — and **stops before submit**. Verified on a live
+GitLab Greenhouse form. `unfilled` is a first-class result and is pruned of false alarms (a form with separate
+first/last fields must not report "Full name" missing), because a noisy list is one the user stops reading.
+
+**Do not build bot-detection evasion.** The user asked for automation that "doesn't feel like a bot" on
+Wellfound. Declined: its purpose is circumventing a security control, it breaks Wellfound's terms, and the
+collateral is the user's own account and application history. The line held here is that driving the user's own
+visible browser while they watch and submit is assistance; disguising automation as human to defeat a detector
+is not. Greenhouse/Lever/Ashby forms need none of that, and every discovered job lives on one of them.
+
+`supports_auto_submit` is still False everywhere, so `POST /applications/submit` reports `needs_manual_step`
+with the form URL rather than pretending. `POST /applications/{job_id}/confirm-applied` records a manually
+submitted form so the never-apply-twice guard and outcome metrics stay correct.
 
 ## Non-negotiable product rules
 

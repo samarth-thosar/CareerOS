@@ -54,6 +54,7 @@ from careeros.infrastructure.config.profile_loader import load_profile
 from careeros.infrastructure.config.settings import Settings, load_settings
 from careeros.infrastructure.events.deferred_event_bus import DeferredEventBus
 from careeros.infrastructure.events.in_process_event_bus import InProcessEventBus
+from careeros.infrastructure.apply.browser_form_filler import BrowserFormFiller
 from careeros.infrastructure.job_sources.ashby_provider import AshbyProvider
 from careeros.infrastructure.job_sources.greenhouse_provider import GreenhouseProvider
 from careeros.infrastructure.job_sources.lever_provider import LeverProvider
@@ -136,6 +137,7 @@ class Container:
     # than each request re-reading from disk.
     answers: ApplicationAnswers
     voice: str
+    form_filler: BrowserFormFiller
 
 
 def search_criteria_from(settings: Settings) -> SearchCriteria:
@@ -202,6 +204,7 @@ def build_container() -> Container:
         achievement_bank=_load_bank_or_warn(),
         answers=load_answers(),
         voice=load_voice(),
+        form_filler=BrowserFormFiller(),
     )
 
 
@@ -284,6 +287,7 @@ def build_services(container: Container, repos: Repositories, event_bus: EventBu
             answers=container.answers,
             event_bus=event_bus,
             clock=container.clock,
+            form_filler=container.form_filler,
         ),
         candidate_profile=CandidateProfileService(
             candidate_profile_repository=repos.candidate_profile,

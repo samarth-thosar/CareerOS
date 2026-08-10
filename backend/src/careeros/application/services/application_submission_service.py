@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 
 from careeros.application.ports.clock import Clock
 from careeros.application.ports.event_bus import EventBus
+from careeros.application.ports.form_filler import FormFillRequest, FormFillResult, FormFiller
 from careeros.application.ports.job_source_provider import JobSourceProvider
 from careeros.domain.application.application import AlreadyAppliedError, ApplicationStatus
 from careeros.domain.candidate.application_answers import ApplicationAnswers
@@ -66,6 +67,7 @@ class ApplicationSubmissionService:
         answers: ApplicationAnswers,
         event_bus: EventBus,
         clock: Clock,
+        form_filler: FormFiller | None = None,
     ) -> None:
         self._application_repository = application_repository
         self._job_repository = job_repository
@@ -74,6 +76,7 @@ class ApplicationSubmissionService:
         self._answers = answers
         self._event_bus = event_bus
         self._clock = clock
+        self._form_filler = form_filler
 
     async def submit_selected(self, job_ids: list[str]) -> BatchSubmissionResult:
         """Apply to exactly the jobs the user picked.
@@ -153,6 +156,54 @@ class ApplicationSubmissionService:
         )
         return SubmissionResult(job_id=job.id, submitted=True)
 
+    async def prepare_form(self, job_id: str) -> FormFillResult:
+        """Draft the application form in the candidate's browser, stopping before submit.
+
+        Refuses on the same grounds as submission -- incomplete answers, no tailored resume, already applied --
+        because a form drafted from placeholder answers is a trap, not a head start.
+        """
+        if self._form_filler is None or not self._form_filler.is_available():
+            return FormFillResult(
+                error="Browser automation is unavailable (Playwright not installed)", left_open_for_review=False
+            )
+
+        missing = self._answers.missing_fields()
+        if missing:
+            return FormFillResult(
+                error="These answers still need you first: " + ", ".join(missing), left_open_for_review=False
+            )
+
+        job = await self._job_repository.get_by_id(job_id)
+        application = await self._application_repository.get_by_job_id(job_id)
+        if job is None or application is None:
+            return FormFillResult(error="Job is not tracked", left_open_for_review=False)
+        if application.applied_at is not None:
+            return FormFillResult(
+                error=f"Already applied on {application.applied_at:%Y-%m-%d}", left_open_for_review=False
+            )
+
+        versions = await self._resume_repository.list_versions_for_job(job_id)
+        rendered = next((v for v in versions if v.pdf_path), None)
+        if rendered is None:
+            return FormFillResult(
+                error="No tailored resume PDF for this job yet — tailor one first",
+                left_open_for_review=False,
+            )
+
+        letter = None
+        if application.current_cover_letter_id:
+            stored = await self._resume_repository.get_cover_letter(application.current_cover_letter_id)
+            letter = stored.content if stored else None
+
+        return await self._form_filler.prepare(
+            FormFillRequest(
+                job_url=job.url,
+                answers=_form_answers(self._answers),
+                resume_pdf_path=rendered.pdf_path,
+                cover_letter=letter,
+            )
+        )
+
     async def confirm_manual_submission(self, job_id: str) -> SubmissionResult:
         """Record that the user submitted a form themselves.
 
@@ -166,3 +217,23 @@ class ApplicationSubmissionService:
         if application.applied_at is not None:
             return SubmissionResult(job_id=job_id, submitted=False, reason="already recorded")
         return await self._record_submission(application, job, method="manual")
+
+
+def _form_answers(answers: ApplicationAnswers) -> dict[str, str]:
+    """Flatten answers into the keys a form filler looks for.
+
+    First/last name are derived rather than stored separately: forms disagree on whether they want one field or
+    two, and asking the candidate for both spellings of the same fact would be busywork.
+    """
+    parts = answers.full_name.split()
+    return {
+        "full_name": answers.full_name,
+        "first_name": parts[0] if parts else "",
+        "last_name": " ".join(parts[1:]) if len(parts) > 1 else "",
+        "email": answers.email,
+        "phone": answers.phone,
+        "current_location": answers.current_location,
+        "linkedin_url": answers.linkedin_url,
+        "github_url": answers.github_url,
+        "portfolio_url": answers.portfolio_url,
+    }

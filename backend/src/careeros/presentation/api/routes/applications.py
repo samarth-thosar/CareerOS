@@ -71,3 +71,19 @@ async def confirm_applied(
     if not outcome.submitted:
         raise HTTPException(status.HTTP_409_CONFLICT, outcome.reason or "could not record")
     return asdict(outcome)
+
+
+@router.post("/{job_id}/prepare-form")
+async def prepare_form(
+    job_id: str,
+    container: Annotated[Container, Depends(get_container)],
+) -> dict[str, Any]:
+    """Open the application form in your browser with everything we know already filled in.
+
+    Stops before submit: you review and press the button. Returns `unfilled` so you know exactly which fields
+    still need you rather than having to audit the whole form.
+    """
+    result = await in_session(container, lambda s: s.submission.prepare_form(job_id))
+    if result.error:
+        raise HTTPException(status.HTTP_409_CONFLICT, result.error)
+    return asdict(result)
