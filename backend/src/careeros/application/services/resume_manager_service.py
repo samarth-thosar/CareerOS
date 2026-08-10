@@ -117,8 +117,12 @@ class ResumeManagerService:
         if response.parsed is None:
             raise TailoringResponseError(f"Model returned no parseable JSON when tailoring for job {job_id}")
 
-        plan = _plan_from(response.parsed)
-        # Raises on any unsupported id, bullet index, skill, or invented figure.
+        plan, dropped_skills = _drop_unclaimable_skills(
+            _plan_from(response.parsed), self._achievement_bank, profile.skills
+        )
+        # Raises on any unsupported id, bullet index or invented figure. Skills were sanitised just above rather
+        # than left to raise: an over-eager skills line is fixable by removing it, whereas a fabricated
+        # achievement or metric means the whole selection is untrustworthy.
         validate_plan(plan, self._achievement_bank, profile.skills)
 
         tailored_tex = self._assembler.assemble(master.content, plan, self._achievement_bank)
@@ -284,6 +288,39 @@ class ResumeManagerService:
                 f"{gaps_markdown}\n\n"
                 "Add these to data/master/achievements.yaml if you can genuinely claim them.\n",
             )
+
+
+def _drop_unclaimable_skills(
+    plan: TailoringPlan, bank: AchievementBank, claimable_skills: list[str]
+) -> tuple[TailoringPlan, list[str]]:
+    """Remove skills the candidate cannot claim, returning them so they become gap flags.
+
+    A hard refusal here would be disproportionate: the achievement selection may be perfectly good and only the
+    "most relevant skills" line over-reached. Dropping the skill keeps the unsupported claim off the document --
+    the guarantee that matters -- while still telling the candidate what the job wanted that they cannot yet
+    back up, which is exactly what a gap flag is for.
+    """
+    claimable = {skill.lower() for skill in claimable_skills} | {
+        technology.lower() for technology in bank.all_technologies()
+    }
+    kept = [skill for skill in plan.skills if skill.lower() in claimable]
+    dropped = [skill for skill in plan.skills if skill.lower() not in claimable]
+    if not dropped:
+        return plan, []
+
+    logger.info("Dropped unclaimable skills from the tailored resume: %s", dropped)
+    gap_notes = [
+        f"Job asks for {skill}, which nothing in your achievement bank supports" for skill in dropped
+    ]
+    return (
+        TailoringPlan(
+            achievements=plan.achievements,
+            skills=kept,
+            summary=plan.summary,
+            gaps=[*plan.gaps, *gap_notes],
+        ),
+        dropped,
+    )
 
 
 def _plan_from(parsed: dict) -> TailoringPlan:

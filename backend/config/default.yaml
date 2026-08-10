@@ -16,12 +16,18 @@ llm:
   provider: ollama
   model: qwen3:8b
   base_url: http://localhost:11434
-  timeout_seconds: 300
+  timeout_seconds: 900
   keep_alive: 10m
   max_output_tokens: 800
   # Qwen3 reasons out loud by default. CareerOS stores the model's own narrative instead, and measurements on
   # this hardware showed ~35% faster scoring with thinking off.
   disable_thinking: true
+
+scheduler:
+  # Background discovery and scoring. Set to false while you are working in the dashboard: one local Ollama
+  # instance serialises generation, so a scheduled scoring batch queues ahead of a tailoring request and times
+  # it out. The batch can wait; you cannot.
+  enabled: true
 
 scoring:
   # Each job costs one local LLM call (~1 minute on a 4GB-VRAM laptop GPU), so the backlog is drained in

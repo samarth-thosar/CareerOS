@@ -357,16 +357,32 @@ class TestRefusesToFabricate:
         with pytest.raises(FabricationError, match="figures absent"):
             await in_session(container, lambda s: s.resume_manager.tailor_for_job(job_id))
 
-    async def test_unclaimable_skill_produces_no_resume(self, container: Container) -> None:
+    async def test_unclaimable_skills_are_dropped_and_reported_as_gaps(self, container: Container) -> None:
+        # Deliberately not a hard refusal: an over-eager skills line is fixable by removing the skill, whereas a
+        # fabricated achievement or metric means the whole selection is untrustworthy. Either way nothing
+        # unsupported reaches the document -- but here the candidate still gets a usable resume plus a gap flag.
         job_id = await _discover(container)
         container.llm_provider = _tailoring_response(skills=["python", "kubernetes", "terraform"])
 
-        with pytest.raises(FabricationError, match="kubernetes"):
-            await in_session(container, lambda s: s.resume_manager.tailor_for_job(job_id))
+        outcome = await in_session(container, lambda s: s.resume_manager.tailor_for_job(job_id))
+        # Assert on selection.json rather than the .tex: the master template's own static skills table may
+        # legitimately mention these technologies, so only the *chosen* list answers the question.
+        selection = json.loads((outcome.artifact_directory / "selection.json").read_text(encoding="utf-8"))
+
+        assert selection["skills"] == ["python"]
+
+        gaps = await in_session(container, lambda s: s.resume_manager.list_pending_gaps())
+        flagged = " ".join(gap.missing_skill_or_requirement.lower() for gap in gaps)
+        assert "kubernetes" in flagged and "terraform" in flagged
 
     async def test_no_artifacts_are_left_behind_by_a_refused_run(self, container: Container) -> None:
         job_id = await _discover(container)
-        container.llm_provider = _tailoring_response(skills=["kubernetes"])
+        # An invented metric is a genuine refusal, unlike an over-eager skill.
+        container.llm_provider = _tailoring_response(
+            achievements=[
+                {"id": "test-role", "bullets": [{"source_index": 0, "rephrased": "Served 9,999 requests/sec."}]}
+            ]
+        )
 
         with pytest.raises(FabricationError):
             await in_session(container, lambda s: s.resume_manager.tailor_for_job(job_id))

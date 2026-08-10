@@ -30,13 +30,26 @@ class LLMSettings(BaseModel):
     model: str = "qwen3:8b"
     base_url: str = "http://localhost:11434"
     # A scoring call measured ~60s on a 4GB-VRAM laptop GPU, so the ceiling is generous.
-    timeout_seconds: float = 300.0
+    # Generous because a single local call can take minutes, and far more under contention: background
+    # scoring and an interactive tailoring request share one Ollama instance, which serialises them.
+    timeout_seconds: float = 900.0
     # Keeps the model resident between calls; reloading dominates when draining a backlog one job at a time.
     keep_alive: str = "10m"
     max_output_tokens: int = 800
     # Qwen3 and other reasoning models emit chain-of-thought by default. CareerOS stores the model's own
     # narrative instead, and disabling thought measured ~35% faster.
     disable_thinking: bool = True
+
+
+class SchedulerSettings(BaseModel):
+    """Background work.
+
+    Turn this off while working interactively. One local Ollama instance serialises generation, so a scheduled
+    20-job scoring batch will queue ahead of a tailoring request and time it out -- the batch is not urgent, the
+    thing you are waiting on is.
+    """
+
+    enabled: bool = True
 
 
 class ScoringSettings(BaseModel):
@@ -130,6 +143,7 @@ class Settings(BaseSettings):
 
     scoring_weights: ScoringWeights = ScoringWeights()
     scoring: ScoringSettings = ScoringSettings()
+    scheduler: SchedulerSettings = SchedulerSettings()
     llm: LLMSettings = LLMSettings()
     feature_flags: FeatureFlags = FeatureFlags()
     job_sources: JobSourceSettings = JobSourceSettings()

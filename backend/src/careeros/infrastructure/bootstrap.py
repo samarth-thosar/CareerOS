@@ -372,6 +372,10 @@ def register_event_handlers(container: Container) -> None:
 
 def register_scheduled_jobs(container: Container) -> None:
     """Periodic work, registered through SchedulerPort so the Celery swap stays a wiring-only change."""
+    if not container.settings.scheduler.enabled:
+        logger.info("Scheduler disabled by config; no background discovery or scoring will run")
+        return
+
     criteria = search_criteria_from(container.settings)
 
     for provider in container.job_source_providers:
