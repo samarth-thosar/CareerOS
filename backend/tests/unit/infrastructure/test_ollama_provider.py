@@ -164,3 +164,63 @@ async def test_backend_error_becomes_a_typed_failure() -> None:
 
     with pytest.raises(LLMRequestError):
         await provider.complete(_prompt())
+
+
+class TestTransientFailureRetry:
+    """Ollama answers 500 while loading a model, so the first call after eviction fails for no good reason."""
+
+    async def test_retries_once_on_a_5xx_and_succeeds(self) -> None:
+
+        attempts = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                return httpx.Response(500, json={"error": "loading model"})
+            return httpx.Response(200, json={"message": {"role": "assistant", "content": '{"score": 71}'}})
+
+        class StubClient(httpx.AsyncClient):
+            def __init__(self, **kwargs) -> None:
+                kwargs.pop("timeout", None)
+                super().__init__(transport=httpx.MockTransport(handler), **kwargs)
+
+        provider = OllamaProvider("http://x", "m", client_factory=StubClient)
+        response = await provider.complete(_prompt())
+
+        assert attempts["n"] == 2
+        assert response.parsed == {"score": 71}
+
+    async def test_gives_up_after_a_second_failure(self) -> None:
+        attempts = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            attempts["n"] += 1
+            return httpx.Response(503, json={"error": "unavailable"})
+
+        class StubClient(httpx.AsyncClient):
+            def __init__(self, **kwargs) -> None:
+                kwargs.pop("timeout", None)
+                super().__init__(transport=httpx.MockTransport(handler), **kwargs)
+
+        provider = OllamaProvider("http://x", "m", client_factory=StubClient)
+
+        with pytest.raises(LLMRequestError):
+            await provider.complete(_prompt())
+        assert attempts["n"] == 2, "exactly one retry, not an unbounded loop"
+
+    async def test_does_not_retry_a_4xx(self) -> None:
+        # A 400 means the request itself is wrong; repeating it just wastes the user's time.
+        attempts = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            attempts["n"] += 1
+            return httpx.Response(400, json={"error": "bad request"})
+
+        class StubClient(httpx.AsyncClient):
+            def __init__(self, **kwargs) -> None:
+                kwargs.pop("timeout", None)
+                super().__init__(transport=httpx.MockTransport(handler), **kwargs)
+
+        with pytest.raises(LLMRequestError):
+            await OllamaProvider("http://x", "m", client_factory=StubClient).complete(_prompt())
+        assert attempts["n"] == 1

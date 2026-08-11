@@ -77,6 +77,26 @@ class DiscoveryService:
         logger.info("Discovery cycle for %s found %d new jobs", provider_name, len(discovered_ids))
         return discovered_ids
 
+    async def add_posting(self, posting: RawJobPosting, source: JobSource) -> tuple[Job, bool]:
+        """Persist a single posting produced outside a discovery cycle, e.g. one the candidate pasted in.
+
+        Returns the job and whether it is new, so the caller can distinguish "added" from "you already had this"
+        instead of silently doing nothing. Deliberately skips the eligibility filter that `run_cycle` applies:
+        that filter exists to stop automated discovery wasting scoring time on unreachable roles, whereas a
+        deliberate paste is an explicit choice and overriding it would be presumptuous.
+        """
+        existing = await self._job_repository.find_by_source(source, posting.source_job_id)
+        if existing is not None:
+            logger.info("Posting already tracked: %s", posting.source_job_id)
+            return existing, False
+
+        job = await self._persist(posting, source)
+        await self._event_bus.publish(
+            JobDiscovered(job_id=job.id, company_id=job.company_id, source=source.value, url=job.url)
+        )
+        logger.info("Added posting %s (%s at %s)", job.id, posting.title, posting.company_name)
+        return job, True
+
     async def _persist(self, posting: RawJobPosting, source: JobSource) -> Job:
         company = await self._company_resolver.resolve(posting.company_name)
         job = Job(

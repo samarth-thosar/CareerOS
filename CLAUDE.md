@@ -89,7 +89,16 @@ config. Payload shapes differ: Lever puts the title in `text`, the location in `
 timestamps in epoch millis; Ashby exposes `isListed`, and unlisted postings are skipped since they cannot be
 applied to.
 
-**Wellfound is not viable and this was checked, not assumed.** It sits behind Cloudflare bot protection — a
+**Wellfound: paste, don't scrape.** `POST /jobs/paste` takes `{url, text}` — the candidate copies a posting from
+a site that cannot be read programmatically, and it joins the normal pipeline (scored, tailored, cover-lettered,
+form-drafted) like any API job. `PastedJobExtractor` pulls fields via the LLM, which is the one place the model
+extracts rather than judges; it is told to copy values verbatim and return empty rather than guess, because an
+invented company or salary corrupts the record everything downstream is built from. The source comes from the
+URL domain, so a Wellfound paste is labelled `wellfound`, not "manual". Eligibility is reported but *not*
+enforced here: the filter exists to stop automated discovery wasting scoring time, and overriding a deliberate
+paste would be presumptuous.
+
+**Wellfound is not viable to read automatically, and this was checked, not assumed.** It sits behind Cloudflare bot protection — a
 filtered listing URL returns 403, and even pages that load block on a second request — publishes no API, gates
 most listings behind a login, and forbids scraping. Lever and Ashby cover the same startup postings through
 documented endpoints. Don't spend time on Wellfound without a logged-in browser session, and note that route

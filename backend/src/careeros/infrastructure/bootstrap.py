@@ -58,6 +58,7 @@ from careeros.infrastructure.apply.browser_form_filler import BrowserFormFiller
 from careeros.infrastructure.job_sources.ashby_provider import AshbyProvider
 from careeros.infrastructure.job_sources.greenhouse_provider import GreenhouseProvider
 from careeros.infrastructure.job_sources.lever_provider import LeverProvider
+from careeros.infrastructure.job_sources.pasted_job_extractor import PastedJobExtractor
 from careeros.infrastructure.llm.ollama_provider import OllamaProvider
 from careeros.infrastructure.persistence.db import create_engine, create_session_factory, session_scope
 from careeros.domain.resume.achievement import AchievementBank
@@ -138,6 +139,7 @@ class Container:
     answers: ApplicationAnswers
     voice: str
     form_filler: BrowserFormFiller
+    pasted_job_extractor: PastedJobExtractor
 
 
 def search_criteria_from(settings: Settings) -> SearchCriteria:
@@ -205,6 +207,16 @@ def build_container() -> Container:
         answers=load_answers(),
         voice=load_voice(),
         form_filler=BrowserFormFiller(),
+        pasted_job_extractor=PastedJobExtractor(
+            OllamaProvider(
+                base_url=settings.llm.base_url,
+                model=settings.llm.model,
+                timeout_seconds=settings.llm.timeout_seconds,
+                keep_alive=settings.llm.keep_alive,
+                max_output_tokens=settings.llm.max_output_tokens,
+                disable_thinking=settings.llm.disable_thinking,
+            )
+        ),
     )
 
 
